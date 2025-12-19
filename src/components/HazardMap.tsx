@@ -1,6 +1,7 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
+// ▼ GeoJSON を追加しました
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, GeoJSON } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect } from 'react';
@@ -54,16 +55,16 @@ type Props = {
     centerPos: { lat: number; lng: number };
     zoomLevel: number;
     onMapChange?: (lat: number, lng: number, zoom: number) => void;
+    boundary?: any; // ▼ 追加：エリア枠線データを受け取れるようにしました
 };
 
+// ▼ 修正：以前解決した「移動とズームを同時に行う修正」を適用しました
 function MapUpdater({ center, zoom }: { center: { lat: number; lng: number }; zoom: number }) {
     const map = useMap();
-
     useEffect(() => {
         // 場所(center) と ズーム(zoom) を同時に指定してアニメーション移動させる
-        // 第2引数に、propsで受け取った新しい zoom をそのまま渡すのが正解です
         map.flyTo([center.lat, center.lng], zoom, {
-            duration: 1.5 // 1.5秒かけて移動
+            duration: 1.5
         });
     }, [center, zoom, map]); // center か zoom どちらかが変わったら発動
 
@@ -90,14 +91,32 @@ function MapController({ onMapChange }: { onMapChange?: (lat: number, lng: numbe
     return null;
 }
 
-export default function HazardMap({ posts, centerPos, zoomLevel, onMapChange }: Props) {
+export default function HazardMap({ posts, centerPos, zoomLevel, onMapChange, boundary }: Props) {
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
             <MapContainer center={[centerPos.lat, centerPos.lng]} zoom={zoomLevel} style={{ height: '100%', width: '100%' }}>
+                <MapUpdater center={centerPos} zoom={zoomLevel} />
+                <MapController onMapChange={onMapChange} />
+
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
+
+                {/* ▼ 追加：エリア枠線の描画機能 ▼ */}
+                {boundary && (
+                    <GeoJSON
+                        key={JSON.stringify(boundary)} // データが切り替わったら再描画
+                        data={boundary}
+                        style={{
+                            color: '#ff7800',
+                            weight: 4,
+                            opacity: 0.65,
+                            fillColor: '#ff7800',
+                            fillOpacity: 0.1
+                        }}
+                    />
+                )}
 
                 {posts.map((post) => {
                     const isHighEmpathy = (post.empathy_count || 0) >= 5;
@@ -168,11 +187,9 @@ export default function HazardMap({ posts, centerPos, zoomLevel, onMapChange }: 
                         </Marker>
                     );
                 })}
-
-                <MapUpdater center={centerPos} zoom={zoomLevel} />
-                <MapController onMapChange={onMapChange} />
             </MapContainer>
 
+            {/* 中央の十字マーク（変更なし） */}
             <div
                 style={{
                     position: 'absolute',
