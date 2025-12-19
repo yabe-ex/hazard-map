@@ -1,7 +1,18 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+    // ▼▼▼ これを追加して false にする ▼▼▼
+    reactStrictMode: false,
+    // ▲▲▲ 追加ここまで ▲▲▲
+
+    experimental: {
+        cpus: 1,
+        workerThreads: false
+    },
+    output: 'export',
+    images: {
+        unoptimized: true
+    }
 };
 
 export default nextConfig;
