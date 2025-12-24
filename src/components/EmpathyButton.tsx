@@ -28,7 +28,7 @@ export default function EmpathyButton({ postId, initialCount, postUserId }: Prop
 
             if (userId) {
                 setMyUserId(userId);
-                // 2. 既に共感済みかチェック
+                // 2. 既に同感済みかチェック
                 const { data } = await supabase.from('hazard_empathies').select('id').eq('post_id', postId).eq('user_id', userId).maybeSingle();
 
                 if (data) setHasEmpathized(true);
@@ -40,7 +40,7 @@ export default function EmpathyButton({ postId, initialCount, postUserId }: Prop
     const handleClick = async () => {
         // 自分の投稿チェック（IDがまだロードされてない場合は後続処理でも弾くが、念のためUI側でもチェック）
         if (myUserId && myUserId === postUserId) {
-            toast('自分の投稿には共感できません', { icon: '🙅‍♂️' });
+            toast('自分の投稿には同感できません', { icon: '🙅‍♂️' });
             return;
         }
 
@@ -48,7 +48,7 @@ export default function EmpathyButton({ postId, initialCount, postUserId }: Prop
 
         try {
             // ---------------------------------------------------------
-            // 1. ユーザーIDの確保（ここが改善ポイント）
+            // 1. ユーザーIDの確保
             // ---------------------------------------------------------
             let targetUserId = myUserId;
 
@@ -65,13 +65,13 @@ export default function EmpathyButton({ postId, initialCount, postUserId }: Prop
 
             // 念押し：自分の投稿ならここでストップ
             if (targetUserId === postUserId) {
-                toast('自分の投稿には共感できません', { icon: '🙅‍♂️' });
+                toast('自分の投稿には同感できません', { icon: '🙅‍♂️' });
                 setIsLoading(false);
                 return;
             }
 
             // ---------------------------------------------------------
-            // 2. 共感データの登録
+            // 2. 同感データの登録
             // ---------------------------------------------------------
             const { error } = await supabase.from('hazard_empathies').insert([{ post_id: postId, user_id: targetUserId }]);
 
@@ -79,7 +79,7 @@ export default function EmpathyButton({ postId, initialCount, postUserId }: Prop
                 // エラーコード 23505 = 一意制約違反（すでに登録済み）
                 if (error.code === '23505') {
                     setHasEmpathized(true);
-                    toast('既に共感済みです');
+                    toast('既に同感済みです');
                 } else {
                     console.error(error);
                     toast.error('通信エラーが発生しました');
@@ -88,7 +88,7 @@ export default function EmpathyButton({ postId, initialCount, postUserId }: Prop
                 // 成功！
                 setCount((prev) => prev + 1);
                 setHasEmpathized(true);
-                toast('共感しました！', { icon: '🤝' });
+                toast('同感しました！', { icon: '✋' });
             }
         } catch (err) {
             console.error(err);
@@ -120,7 +120,7 @@ export default function EmpathyButton({ postId, initialCount, postUserId }: Prop
                     transition: 'all 0.2s'
                 }}
             >
-                <span>{hasEmpathized ? '🤝 共感済み' : '✋ 共感'}</span>
+                <span>{hasEmpathized ? '✋ 同感済み' : '✋ 同感'}</span>
                 <span style={{ fontWeight: 'bold' }}>{count}</span>
             </button>
 
