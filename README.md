@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# プロジェクト概要: みんなのハザードマップ開発
 
-## Getting Started
+## 1. プロジェクトの全貌
+市民が感じる「日常の不安（暗い、見通しが悪いなど）」を地図上に可視化し、共有するハザードマップアプリケーション。
+行政区分にとらわれない直感的な投稿機能と、自治体管理者がデータを分析・管理するためのダッシュボード機能を持つ。
 
-First, run the development server:
+### 主な機能
+* **一般ユーザー:** 地図閲覧、現在地取得、不安箇所の投稿（理由・タグ・時間帯）、他者の投稿への「同感」アクション。
+* **管理者:** 投稿データの閲覧、エリア・カテゴリによる絞り込み、詳細住所の確認、地図スタイル切り替え。
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 2. 開発環境・技術スタック
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### フロントエンド
+* **Framework:** Next.js (App Router)
+* **Language:** TypeScript
+* **Library:** React
+* **Map:** Leaflet / React-Leaflet
+* **UI Notifications:** react-hot-toast
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### バックエンド / インフラ
+* **BaaS:** Supabase
+    * **Database:** PostgreSQL (PostGIS extension for future use)
+    * **Auth:** Supabase Auth (Anonymous login support)
+    * **Storage:** Supabase Storage (画像保存用・予定)
 
-## Learn More
+### 外部API・データソース
+* **Map Tiles:**
+    * OpenStreetMap (Standard)
+    * CartoDB (Positron / Simple)
+    * Esri World Imagery (Satellite)
+* **Geocoding:** OpenStreetMap Nominatim API (逆ジオコーディング：座標から住所・自治体コード取得)
+* **Boundaries:** JapanCityGeoJson (行政区域のGeoJSONデータ)
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 3. 現在までの実装内容
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 📂 データ構造 (Supabase)
+* `hazard_posts`: 投稿データ（緯度経度、不安理由、タグ、時間帯、同感数、自治体コード、住所テキスト）。
+* `hazard_empathies`: 同感アクションの管理（重複防止）。
 
-## Deploy on Vercel
+### 📱 一般ユーザー画面 (`src/app/page.tsx`)
+* **地図表示:** 全画面地図表示。前回表示位置のローカルストレージ保存と復元。
+* **投稿機能:**
+    * GPSによる現在地取得。
+    * モーダルによる詳細入力（不安理由の選択、タグ、時間帯）。
+    * **重複チェック:** 半径50m以内に類似投稿がある場合、新規投稿ではなく「同感」を促すUI。
+    * **自動住所特定:** 投稿時にAPIを叩き、正確な住所と自治体コード(`city_code`)を自動付与してDB保存。
+* **地図操作:**
+    * 右上のレイヤーボタンで「標準・シンプル・航空写真」の切り替え。
+    * 投稿ピンの表示（同感数5以上で赤色、それ以外は青色）。
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 🖥️ 管理者ダッシュボード (`src/app/admin/page.tsx`)
+* **レイアウト:** 左サイドバー（操作パネル）＋ 右メイン（地図＆テーブル）の2カラム構成。
+* **フィルタリング機能:**
+    * **表示エリア選択:** 川越市、所沢市、狭山市、ふじみ野市（選択すると地図移動＆データ絞り込み）。
+    * **不安カテゴリ:** チェックボックスによるリアルタイム絞り込み。
+* **可視化:**
+    * 選択した自治体の境界線を青色で強調表示（GeoJSON）。
+    * 現在の表示件数を大きく表示。
+* **データリスト:**
+    * 投稿一覧のテーブル表示（ID、理由、**住所**、タグ、同感数、日時）。
+    * 「移動」ボタン：地図上の該当箇所へズーム。
+    * 「写真」ボタン：クリックでトースト表示（機能は未実装）。
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### ⚙️ 共通設定 (`src/constants/`)
+* `cities.ts`: 各自治体の定義（ID、座標、ズーム率）を一元管理。ここに追加するだけで全画面に反映。
+* `reasons.ts`: 不安理由やタグの定義を一元管理。
+
+---
+
+## 4. これから実装予定のこと
+
+### 📸 写真アップロード機能
+* **クライアント側処理:**
+    * スマホで撮影/選択した画像を、ブラウザ側でリサイズ・圧縮（通信量削減と高速化）。
+* **ストレージ保存:**
+    * Supabase Storageへのアップロード処理。
+    * 発行された公開URLを `hazard_posts` テーブルの `image_url` カラムに保存。
+* **表示対応:**
+    * 投稿詳細（ポップアップ）での画像表示。
+    * 管理者テーブルの「写真」ボタンの実装（モーダル等で画像を確認可能にする）。
+
+### 🛡️ セキュリティ・権限管理の強化
+* **RLS (Row Level Security) の設定:**
+    * 住所カラム (`address`) は管理者のみが `SELECT` できるようにポリシーを設定（プライバシー保護）。
+    * 画像削除権限の制御。
+
+### 📊 分析機能の拡充（将来構想）
+* ヒートマップ表示（不安が集中している箇所の可視化）。
+* CSVエクスポート機能。
