@@ -9,6 +9,7 @@ import { REASONS, REASON_TAGS, ReasonType } from '@/constants/reasons';
 import { CITY_NAME_TO_CODE } from '@/constants/cities';
 import toast from 'react-hot-toast';
 import { useSearchParams, useRouter } from 'next/navigation';
+import imageCompression from 'browser-image-compression';
 
 const HazardMap = dynamic(() => import('@/components/HazardMap'), {
     loading: () => <div className="p-10 text-center text-gray-500">地図を読み込み中...</div>,
@@ -138,6 +139,11 @@ export default function Home() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoadingGPS, setIsLoadingGPS] = useState(false);
     const [user, setUser] = useState<User | null>(null);
+
+    // 画像アップロード用のState
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
     const router = useRouter();
 
     useEffect(() => {
@@ -171,6 +177,9 @@ export default function Home() {
         setDuplicatePost(null);
         setIsSelfDuplicate(false);
         setFormTags([]);
+        setFormTimes([]);
+        setSelectedFile(null);
+        setPreviewUrl(null);
     }, [formReason, isModalOpen]);
 
     // ▼▼▼ 地図移動時に保存 ▼▼▼
@@ -210,6 +219,51 @@ export default function Home() {
     const toggleTag = (tag: string) => setFormTags((p) => (p.includes(tag) ? p.filter((t) => t !== tag) : [...p, tag]));
     const toggleTime = (time: string) => setFormTimes((p) => (p.includes(time) ? p.filter((t) => t !== time) : [...p, time]));
 
+    // ファイル選択ハンドラ
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            const url = URL.createObjectURL(file);
+            setPreviewUrl(url);
+            setSelectedFile(file);
+        }
+    };
+
+    // 画像削除ハンドラ
+    const handleRemoveFile = () => {
+        setSelectedFile(null);
+        setPreviewUrl(null);
+    };
+
+    // 画像アップロード処理
+    const uploadImage = async (file: File): Promise<string | null> => {
+        try {
+            const options = {
+                maxSizeMB: 1, // 1MB以下に圧縮
+                maxWidthOrHeight: 1200, // 長辺を1200pxに
+                useWebWorker: true
+            };
+            const compressedFile = await imageCompression(file, options);
+
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            const { error: uploadError } = await supabase.storage.from('hazard-photos').upload(filePath, compressedFile);
+
+            if (uploadError) {
+                console.error('Upload error:', uploadError);
+                throw uploadError;
+            }
+
+            const { data } = supabase.storage.from('hazard-photos').getPublicUrl(filePath);
+            return data.publicUrl;
+        } catch (error) {
+            console.error('Image upload failed:', error);
+            return null;
+        }
+    };
+
     const handleCheckDuplicate = async (e: React.FormEvent) => {
         e.preventDefault();
         const DUPLICATE_DISTANCE_THRESHOLD = 50;
@@ -240,12 +294,24 @@ export default function Home() {
             return;
         }
         setIsSubmitting(true);
-        const toastId = toast.loading('住所を特定して送信中...');
+        const toastId = toast.loading('データを送信中...');
 
         const { fullAddress, cityCode, cityName } = await getAddressFromCoords(center.lat, center.lng);
 
         if (cityName) {
             toast.success(`${cityName}の投稿として保存します`, { id: toastId });
+        }
+
+        // 画像アップロード処理
+        let uploadedImageUrl = null;
+        if (selectedFile) {
+            toast.loading('写真をアップロード中...', { id: toastId });
+            uploadedImageUrl = await uploadImage(selectedFile);
+            if (!uploadedImageUrl) {
+                toast.error('写真のアップロードに失敗しました', { id: toastId });
+                setIsSubmitting(false);
+                return;
+            }
         }
 
         const { error } = await supabase.from('hazard_posts').insert([
@@ -257,7 +323,8 @@ export default function Home() {
                 time_slot: formTimes,
                 user_id: user.id,
                 city_code: cityCode,
-                address: fullAddress
+                address: fullAddress,
+                image_url: uploadedImageUrl
             }
         ]);
 
@@ -387,7 +454,14 @@ export default function Home() {
             </header>
 
             <div style={{ flex: 1, position: 'relative' }}>
-                <HazardMap posts={posts} centerPos={center} zoomLevel={zoom} onMapChange={handleMapChange} mapMode={mapMode} />
+                <HazardMap
+                    posts={posts}
+                    centerPos={center}
+                    zoomLevel={zoom}
+                    onMapChange={handleMapChange}
+                    mapMode={mapMode}
+                    currentUserId={user?.id}
+                />
 
                 <div
                     style={{
@@ -795,6 +869,90 @@ export default function Home() {
                                             );
                                         })}
                                     </div>
+                                </div>
+
+                                <div style={sectionStyle}>
+                                    <label style={labelStyle}>
+                                        写真 <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#888' }}>（任意・1枚のみ）</span>
+                                    </label>
+
+                                    {!previewUrl ? (
+                                        <div style={{ position: 'relative', overflow: 'hidden' }}>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleFileSelect}
+                                                id="file-upload"
+                                                style={{
+                                                    position: 'absolute',
+                                                    left: 0,
+                                                    top: 0,
+                                                    opacity: 0,
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    cursor: 'pointer'
+                                                }}
+                                            />
+                                            <label
+                                                htmlFor="file-upload"
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '8px',
+                                                    padding: '15px',
+                                                    border: '2px dashed #ccc',
+                                                    borderRadius: '8px',
+                                                    color: '#666',
+                                                    background: '#f9f9f9',
+                                                    cursor: 'pointer',
+                                                    textAlign: 'center',
+                                                    fontSize: '14px'
+                                                }}
+                                            >
+                                                <span style={{ fontSize: '20px' }}>📷</span> 写真を選択する
+                                            </label>
+                                        </div>
+                                    ) : (
+                                        <div style={{ position: 'relative', display: 'inline-block' }}>
+                                            {/* プレビュー画像 */}
+                                            <img
+                                                src={previewUrl}
+                                                alt="プレビュー"
+                                                style={{
+                                                    maxWidth: '100%',
+                                                    maxHeight: '200px',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid #ddd'
+                                                }}
+                                            />
+                                            {/* 削除ボタン */}
+                                            <button
+                                                type="button"
+                                                onClick={handleRemoveFile}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: '-8px',
+                                                    right: '-8px',
+                                                    background: '#ff4d4f',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '50%',
+                                                    width: '24px',
+                                                    height: '24px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: '14px',
+                                                    fontWeight: 'bold',
+                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                                                }}
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '12px', marginTop: '30px' }}>

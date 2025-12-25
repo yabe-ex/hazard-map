@@ -26,6 +26,9 @@ export default function AdminPage() {
     const [zoom, setZoom] = useState(11);
     const [mapMode, setMapMode] = useState<'standard' | 'simple' | 'satellite'>('standard');
 
+    // プレビュー用の画像URL管理
+    const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+
     useEffect(() => {
         const fetchPosts = async () => {
             const { data, error } = await supabase.from('hazard_posts').select('*').order('created_at', { ascending: false });
@@ -34,7 +37,6 @@ export default function AdminPage() {
             } else {
                 setAllPosts(data || []);
                 setFilteredPosts(data || []);
-                // ▼▼▼ 修正箇所: エラー回避のためスプレッド構文でコピーを渡す ▼▼▼
                 setSelectedReasons([...REASONS]);
             }
         };
@@ -105,16 +107,19 @@ export default function AdminPage() {
         localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify({ lat, lng, zoom: newZoom }));
     };
 
-    // ▼▼▼ 追加: 写真ボタン用ハンドラ ▼▼▼
-    const handleShowPhoto = () => {
-        toast('写真機能は未実装です', {
-            icon: '📷',
-            style: {
-                borderRadius: '10px',
-                background: '#333',
-                color: '#fff'
-            }
-        });
+    const handleShowPhoto = (imageUrl?: string) => {
+        if (!imageUrl) {
+            toast('写真はありません', {
+                icon: 'no',
+                style: { borderRadius: '10px', background: '#333', color: '#fff' }
+            });
+            return;
+        }
+        setPreviewImageUrl(imageUrl);
+    };
+
+    const closePreview = () => {
+        setPreviewImageUrl(null);
     };
 
     return (
@@ -294,6 +299,7 @@ export default function AdminPage() {
                         mapMode={mapMode}
                         // @ts-ignore
                         selectedCityId={currentCityKey ? CITIES[currentCityKey].id : null}
+                        isAdmin={true}
                     />
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto', background: '#f0f2f5', padding: '20px' }}>
@@ -344,38 +350,74 @@ export default function AdminPage() {
                                         </td>
                                         <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                                {/* 移動ボタン */}
+                                                {/* ▼▼▼ 移動ボタン (アイコン化) ▼▼▼ */}
                                                 <button
                                                     onClick={() => handleJumpToPost(post.lat, post.lng)}
                                                     style={{
-                                                        padding: '6px 12px',
+                                                        padding: '6px 10px',
                                                         background: '#3498db',
-                                                        border: 'none',
+                                                        border: '1px solid #2980b9',
                                                         color: 'white',
                                                         borderRadius: '4px',
                                                         cursor: 'pointer',
                                                         fontSize: '12px',
-                                                        fontWeight: 'bold',
-                                                        whiteSpace: 'nowrap'
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        transition: 'all 0.2s ease'
                                                     }}
+                                                    title="地図へ移動" // ツールチップ
                                                 >
-                                                    移動
+                                                    <svg
+                                                        width="16"
+                                                        height="16"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        strokeWidth="2"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                    >
+                                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 0 18 0z" />
+                                                        <circle cx="12" cy="10" r="3" />
+                                                    </svg>
                                                 </button>
-                                                {/* 写真ボタン (追加) */}
+                                                {/* ▲▲▲ 修正ここまで ▲▲▲ */}
+
+                                                {/* 写真ボタン */}
                                                 <button
-                                                    onClick={handleShowPhoto}
+                                                    onClick={() => handleShowPhoto(post.image_url)}
+                                                    disabled={!post.image_url}
                                                     style={{
-                                                        padding: '5px 10px',
-                                                        background: '#fff',
-                                                        border: '1px solid #ccc',
-                                                        color: '#555',
+                                                        padding: '6px 10px',
+                                                        background: post.image_url ? '#3498db' : '#f0f2f5',
+                                                        border: post.image_url ? '1px solid #2980b9' : '1px solid #dce0e5',
+                                                        color: post.image_url ? '#ffffff' : '#aab2bd',
                                                         borderRadius: '4px',
-                                                        cursor: 'pointer',
+                                                        cursor: post.image_url ? 'pointer' : 'not-allowed',
                                                         fontSize: '12px',
-                                                        whiteSpace: 'nowrap'
+                                                        whiteSpace: 'nowrap',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        transition: 'all 0.2s ease'
                                                     }}
+                                                    title={post.image_url ? '写真を見る' : '写真はありません'}
                                                 >
-                                                    📷
+                                                    <svg
+                                                        width="16"
+                                                        height="16"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        strokeWidth="2"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                    >
+                                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                                        <circle cx="8.5" cy="8.5" r="1.5" />
+                                                        <polyline points="21 15 16 10 5 21" />
+                                                    </svg>
                                                 </button>
                                             </div>
                                         </td>
@@ -393,6 +435,68 @@ export default function AdminPage() {
                     </div>
                 </div>
             </div>
+
+            {/* 画面中央への拡大表示用モーダル */}
+            {previewImageUrl && (
+                <div
+                    onClick={closePreview}
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        background: 'rgba(0, 0, 0, 0.85)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 99999,
+                        cursor: 'pointer',
+                        padding: '20px'
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            position: 'relative',
+                            maxWidth: '90%',
+                            maxHeight: '90%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center'
+                        }}
+                    >
+                        <img
+                            src={previewImageUrl}
+                            alt="拡大プレビュー"
+                            style={{
+                                width: 'auto',
+                                height: 'auto',
+                                maxWidth: '100%',
+                                maxHeight: '85vh',
+                                borderRadius: '4px',
+                                boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+                            }}
+                        />
+                        <button
+                            onClick={closePreview}
+                            style={{
+                                position: 'absolute',
+                                top: '-40px',
+                                right: '-10px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'white',
+                                fontSize: '30px',
+                                cursor: 'pointer',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            ×
+                        </button>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }

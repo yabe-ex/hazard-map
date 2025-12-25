@@ -66,6 +66,7 @@ type Post = {
     user_id: string;
     empathy_count: number;
     city_code?: string;
+    image_url?: string;
 };
 
 type Props = {
@@ -75,6 +76,8 @@ type Props = {
     onMapChange?: (lat: number, lng: number, zoom: number) => void;
     selectedCityId?: string | null;
     mapMode?: MapMode;
+    currentUserId?: string;
+    isAdmin?: boolean;
 };
 
 function MapUpdater({ center, zoom }: { center: { lat: number; lng: number }; zoom: number }) {
@@ -83,7 +86,6 @@ function MapUpdater({ center, zoom }: { center: { lat: number; lng: number }; zo
         const currentCenter = map.getCenter();
         const currentZoom = map.getZoom();
 
-        // 無限ループ防止: 現在地と目標地点がほぼ同じなら移動しない
         const dist = Math.abs(currentCenter.lat - center.lat) + Math.abs(currentCenter.lng - center.lng);
         if (dist > 0.000001 || currentZoom !== zoom) {
             map.flyTo([center.lat, center.lng], zoom, { duration: 1.5 });
@@ -151,7 +153,16 @@ function CityBoundary({ cityId }: { cityId: string }) {
     );
 }
 
-export default function HazardMap({ posts, centerPos, zoomLevel, onMapChange, selectedCityId, mapMode = 'standard' }: Props) {
+export default function HazardMap({
+    posts,
+    centerPos,
+    zoomLevel,
+    onMapChange,
+    selectedCityId,
+    mapMode = 'standard',
+    currentUserId,
+    isAdmin = false
+}: Props) {
     const currentMode = mapMode && MAP_STYLES[mapMode] ? mapMode : 'standard';
     const tileStyle = MAP_STYLES[currentMode];
 
@@ -162,12 +173,12 @@ export default function HazardMap({ posts, centerPos, zoomLevel, onMapChange, se
 
                 {selectedCityId && <CityBoundary cityId={selectedCityId} />}
 
-                {/* ▼▼▼ 修正箇所: MarkerClusterGroup で囲むだけ ▼▼▼ */}
-                {/* chunkedLoading: 大量のピンがある場合に動作を軽くする */}
                 <MarkerClusterGroup chunkedLoading>
                     {posts.map((post) => {
                         const isHighEmpathy = (post.empathy_count || 0) >= 5;
                         const icon = isHighEmpathy ? RedIcon : BlueIcon;
+
+                        const showImage = isAdmin || (currentUserId && post.user_id === currentUserId);
 
                         return (
                             <Marker key={post.id} position={[post.lat, post.lng]} icon={icon}>
@@ -185,9 +196,43 @@ export default function HazardMap({ posts, centerPos, zoomLevel, onMapChange, se
                                         >
                                             {post.reason}
                                         </div>
-                                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
-                                            {TIME_LABELS[post.time_slot?.[0]]} / 同感: {post.empathy_count || 0}
-                                        </div>
+
+                                        {post.image_url && showImage && (
+                                            <div style={{ marginBottom: '8px' }}>
+                                                <img
+                                                    src={post.image_url}
+                                                    alt="現場写真"
+                                                    style={{
+                                                        width: '100%',
+                                                        height: 'auto',
+                                                        borderRadius: '6px',
+                                                        objectFit: 'cover',
+                                                        maxHeight: '150px',
+                                                        border: '1px solid #eee'
+                                                    }}
+                                                />
+                                                {!isAdmin && (
+                                                    <div style={{ fontSize: '10px', color: '#888', marginTop: '4px', textAlign: 'right' }}>
+                                                        ※あなただけに表示されています
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* ▼▼▼ 修正箇所：詳細（タグ・時間帯）がある場合のみ表示 ▼▼▼ */}
+                                        {(() => {
+                                            const tags = post.tags || [];
+                                            const times = (post.time_slot || []).map((t) => TIME_LABELS[t]).filter(Boolean);
+                                            // タグと時間帯を結合
+                                            const details = [...tags, ...times];
+
+                                            // 詳細データがなければ何も表示しない
+                                            if (details.length === 0) return null;
+
+                                            return <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>{details.join('・')}</div>;
+                                        })()}
+                                        {/* ▲▲▲ 修正ここまで ▲▲▲ */}
+
                                         <EmpathyButton postId={post.id} initialCount={post.empathy_count || 0} postUserId={post.user_id} />
                                     </div>
                                 </Popup>
@@ -195,7 +240,6 @@ export default function HazardMap({ posts, centerPos, zoomLevel, onMapChange, se
                         );
                     })}
                 </MarkerClusterGroup>
-                {/* ▲▲▲ 修正箇所ここまで ▲▲▲ */}
 
                 <MapUpdater center={centerPos} zoom={zoomLevel} />
                 <MapController onMapChange={onMapChange} />
