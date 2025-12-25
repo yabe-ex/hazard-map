@@ -1,7 +1,10 @@
 'use client';
 
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, GeoJSON } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import L from 'leaflet';
 import { useEffect, useState } from 'react';
 import EmpathyButton from './EmpathyButton';
@@ -159,35 +162,40 @@ export default function HazardMap({ posts, centerPos, zoomLevel, onMapChange, se
 
                 {selectedCityId && <CityBoundary cityId={selectedCityId} />}
 
-                {posts.map((post) => {
-                    const isHighEmpathy = (post.empathy_count || 0) >= 5;
-                    const icon = isHighEmpathy ? RedIcon : BlueIcon;
+                {/* ▼▼▼ 修正箇所: MarkerClusterGroup で囲むだけ ▼▼▼ */}
+                {/* chunkedLoading: 大量のピンがある場合に動作を軽くする */}
+                <MarkerClusterGroup chunkedLoading>
+                    {posts.map((post) => {
+                        const isHighEmpathy = (post.empathy_count || 0) >= 5;
+                        const icon = isHighEmpathy ? RedIcon : BlueIcon;
 
-                    return (
-                        <Marker key={post.id} position={[post.lat, post.lng]} icon={icon}>
-                            <Popup minWidth={200} maxWidth={280}>
-                                <div style={{ fontFamily: 'sans-serif' }}>
-                                    <div
-                                        style={{
-                                            fontSize: '16px',
-                                            fontWeight: 'bold',
-                                            color: '#333',
-                                            marginBottom: '8px',
-                                            paddingBottom: '8px',
-                                            borderBottom: '1px solid #eee'
-                                        }}
-                                    >
-                                        {post.reason}
+                        return (
+                            <Marker key={post.id} position={[post.lat, post.lng]} icon={icon}>
+                                <Popup minWidth={200} maxWidth={280}>
+                                    <div style={{ fontFamily: 'sans-serif' }}>
+                                        <div
+                                            style={{
+                                                fontSize: '16px',
+                                                fontWeight: 'bold',
+                                                color: '#333',
+                                                marginBottom: '8px',
+                                                paddingBottom: '8px',
+                                                borderBottom: '1px solid #eee'
+                                            }}
+                                        >
+                                            {post.reason}
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                                            {TIME_LABELS[post.time_slot?.[0]]} / 同感: {post.empathy_count || 0}
+                                        </div>
+                                        <EmpathyButton postId={post.id} initialCount={post.empathy_count || 0} postUserId={post.user_id} />
                                     </div>
-                                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
-                                        {TIME_LABELS[post.time_slot?.[0]]} / 同感: {post.empathy_count || 0}
-                                    </div>
-                                    <EmpathyButton postId={post.id} initialCount={post.empathy_count || 0} postUserId={post.user_id} />
-                                </div>
-                            </Popup>
-                        </Marker>
-                    );
-                })}
+                                </Popup>
+                            </Marker>
+                        );
+                    })}
+                </MarkerClusterGroup>
+                {/* ▲▲▲ 修正箇所ここまで ▲▲▲ */}
 
                 <MapUpdater center={centerPos} zoom={zoomLevel} />
                 <MapController onMapChange={onMapChange} />

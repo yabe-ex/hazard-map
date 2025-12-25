@@ -34,13 +34,14 @@ export default function AdminPage() {
             } else {
                 setAllPosts(data || []);
                 setFilteredPosts(data || []);
-                setSelectedReasons(REASONS);
+                // ▼▼▼ 修正箇所: エラー回避のためスプレッド構文でコピーを渡す ▼▼▼
+                setSelectedReasons([...REASONS]);
             }
         };
         fetchPosts();
     }, []);
 
-    // ▼▼▼ 位置情報の復元 ▼▼▼
+    // 位置情報の復元
     useEffect(() => {
         const savedPos = localStorage.getItem(ADMIN_STORAGE_KEY);
         if (savedPos) {
@@ -76,7 +77,6 @@ export default function AdminPage() {
             const defaultCenter = { lat: 35.85, lng: 139.5 };
             setCenter(defaultCenter);
             setZoom(11);
-            // 保存
             localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify({ ...defaultCenter, zoom: 11 }));
             return;
         }
@@ -85,7 +85,6 @@ export default function AdminPage() {
         if (city) {
             setCenter({ lat: city.lat, lng: city.lng });
             setZoom(city.zoom);
-            // 保存
             localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify({ lat: city.lat, lng: city.lng, zoom: city.zoom }));
         }
     };
@@ -97,15 +96,25 @@ export default function AdminPage() {
     const handleJumpToPost = (lat: number, lng: number) => {
         setCenter({ lat, lng });
         setZoom(16);
-        // 保存
         localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify({ lat, lng, zoom: 16 }));
     };
 
     const handleMapChange = (lat: number, lng: number, newZoom: number) => {
         setCenter({ lat, lng });
         setZoom(newZoom);
-        // 保存
         localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify({ lat, lng, zoom: newZoom }));
+    };
+
+    // ▼▼▼ 追加: 写真ボタン用ハンドラ ▼▼▼
+    const handleShowPhoto = () => {
+        toast('写真機能は未実装です', {
+            icon: '📷',
+            style: {
+                borderRadius: '10px',
+                background: '#333',
+                color: '#fff'
+            }
+        });
     };
 
     return (
@@ -334,21 +343,41 @@ export default function AdminPage() {
                                             {new Date(post.created_at).toLocaleDateString()}
                                         </td>
                                         <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                            <button
-                                                onClick={() => handleJumpToPost(post.lat, post.lng)}
-                                                style={{
-                                                    padding: '6px 14px',
-                                                    background: '#3498db',
-                                                    border: 'none',
-                                                    color: 'white',
-                                                    borderRadius: '4px',
-                                                    cursor: 'pointer',
-                                                    fontSize: '12px',
-                                                    fontWeight: 'bold'
-                                                }}
-                                            >
-                                                移動
-                                            </button>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                                {/* 移動ボタン */}
+                                                <button
+                                                    onClick={() => handleJumpToPost(post.lat, post.lng)}
+                                                    style={{
+                                                        padding: '6px 12px',
+                                                        background: '#3498db',
+                                                        border: 'none',
+                                                        color: 'white',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer',
+                                                        fontSize: '12px',
+                                                        fontWeight: 'bold',
+                                                        whiteSpace: 'nowrap'
+                                                    }}
+                                                >
+                                                    移動
+                                                </button>
+                                                {/* 写真ボタン (追加) */}
+                                                <button
+                                                    onClick={handleShowPhoto}
+                                                    style={{
+                                                        padding: '5px 10px',
+                                                        background: '#fff',
+                                                        border: '1px solid #ccc',
+                                                        color: '#555',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer',
+                                                        fontSize: '12px',
+                                                        whiteSpace: 'nowrap'
+                                                    }}
+                                                >
+                                                    📷
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
