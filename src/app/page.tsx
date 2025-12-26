@@ -77,11 +77,9 @@ function determineCityCode(lat: number, lng: number): string | null {
     return null;
 }
 
-// ▼▼▼ 位置情報の復元ロジック ▼▼▼
 function MapControllerLogic({ setCenter, setZoom }: { setCenter: (pos: { lat: number; lng: number }) => void; setZoom: (z: number) => void }) {
     const searchParams = useSearchParams();
 
-    // URLパラメータがある場合 (優先)
     useEffect(() => {
         const latParam = searchParams.get('lat');
         const lngParam = searchParams.get('lng');
@@ -99,7 +97,6 @@ function MapControllerLogic({ setCenter, setZoom }: { setCenter: (pos: { lat: nu
         }
     }, [searchParams, setCenter, setZoom]);
 
-    // URLパラメータがない場合、localStorageから復元
     useEffect(() => {
         const currentParams = new URLSearchParams(window.location.search);
         if (currentParams.has('lat') && currentParams.has('lng')) return;
@@ -109,7 +106,6 @@ function MapControllerLogic({ setCenter, setZoom }: { setCenter: (pos: { lat: nu
             try {
                 const parsed = JSON.parse(savedPos);
                 if (parsed.lat && parsed.lng) {
-                    console.log('Restoring map position:', parsed); // デバッグ用ログ
                     setCenter({ lat: parsed.lat, lng: parsed.lng });
                     if (parsed.zoom) setZoom(parsed.zoom);
                 }
@@ -117,7 +113,7 @@ function MapControllerLogic({ setCenter, setZoom }: { setCenter: (pos: { lat: nu
                 console.error(e);
             }
         }
-    }, [setCenter, setZoom]); // 依存配列に追加
+    }, [setCenter, setZoom]);
     return null;
 }
 
@@ -140,7 +136,6 @@ export default function Home() {
     const [isLoadingGPS, setIsLoadingGPS] = useState(false);
     const [user, setUser] = useState<User | null>(null);
 
-    // 画像アップロード用のState
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -182,7 +177,6 @@ export default function Home() {
         setPreviewUrl(null);
     }, [formReason, isModalOpen]);
 
-    // ▼▼▼ 地図移動時に保存 ▼▼▼
     const handleMapChange = (lat: number, lng: number, newZoom: number) => {
         setCenter({ lat, lng });
         setZoom(newZoom);
@@ -199,10 +193,8 @@ export default function Home() {
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const { latitude, longitude } = position.coords;
-                // 強制的に移動させるために setCenter を呼ぶ
                 setCenter({ lat: latitude, lng: longitude });
                 setZoom(16);
-                // 保存も忘れずに
                 localStorage.setItem(STORAGE_KEY, JSON.stringify({ lat: latitude, lng: longitude, zoom: 16 }));
                 toast.success('現在地に移動しました', { id: 'gps' });
                 setIsLoadingGPS(false);
@@ -219,7 +211,6 @@ export default function Home() {
     const toggleTag = (tag: string) => setFormTags((p) => (p.includes(tag) ? p.filter((t) => t !== tag) : [...p, tag]));
     const toggleTime = (time: string) => setFormTimes((p) => (p.includes(time) ? p.filter((t) => t !== time) : [...p, time]));
 
-    // ファイル選択ハンドラ
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
@@ -229,18 +220,16 @@ export default function Home() {
         }
     };
 
-    // 画像削除ハンドラ
     const handleRemoveFile = () => {
         setSelectedFile(null);
         setPreviewUrl(null);
     };
 
-    // 画像アップロード処理
     const uploadImage = async (file: File): Promise<string | null> => {
         try {
             const options = {
-                maxSizeMB: 1, // 1MB以下に圧縮
-                maxWidthOrHeight: 1200, // 長辺を1200pxに
+                maxSizeMB: 1,
+                maxWidthOrHeight: 1200,
                 useWebWorker: true
             };
             const compressedFile = await imageCompression(file, options);
@@ -302,7 +291,6 @@ export default function Home() {
             toast.success(`${cityName}の投稿として保存します`, { id: toastId });
         }
 
-        // 画像アップロード処理
         let uploadedImageUrl = null;
         if (selectedFile) {
             toast.loading('写真をアップロード中...', { id: toastId });
@@ -363,6 +351,10 @@ export default function Home() {
     const handleLogout = async () => {
         await supabase.auth.signOut();
         window.location.reload();
+    };
+
+    const handlePostUpdate = (postId: number, newCount: number) => {
+        setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, empathy_count: newCount } : p)));
     };
 
     const sectionStyle = { marginBottom: '28px' };
@@ -461,6 +453,7 @@ export default function Home() {
                     onMapChange={handleMapChange}
                     mapMode={mapMode}
                     currentUserId={user?.id}
+                    onPostUpdate={handlePostUpdate}
                 />
 
                 <div
@@ -915,7 +908,6 @@ export default function Home() {
                                         </div>
                                     ) : (
                                         <div style={{ position: 'relative', display: 'inline-block' }}>
-                                            {/* プレビュー画像 */}
                                             <img
                                                 src={previewUrl}
                                                 alt="プレビュー"
@@ -926,7 +918,6 @@ export default function Home() {
                                                     border: '1px solid #ddd'
                                                 }}
                                             />
-                                            {/* 削除ボタン */}
                                             <button
                                                 type="button"
                                                 onClick={handleRemoveFile}

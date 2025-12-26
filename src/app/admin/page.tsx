@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import dynamic from 'next/dynamic';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import { REASONS, ReasonType } from '@/constants/reasons';
 import { CITIES } from '@/constants/cities';
@@ -13,8 +13,8 @@ const HazardMap = dynamic(() => import('@/components/HazardMap'), {
     ssr: false
 });
 
-// 管理画面用の保存キー
 const ADMIN_STORAGE_KEY = 'hazard-map-admin-pos';
+const ITEMS_PER_PAGE = 100; // リストの1ページあたりの表示件数
 
 export default function AdminPage() {
     const router = useRouter();
@@ -26,12 +26,22 @@ export default function AdminPage() {
     const [zoom, setZoom] = useState(11);
     const [mapMode, setMapMode] = useState<'standard' | 'simple' | 'satellite'>('standard');
 
-    // プレビュー用の画像URL管理
+    const [isHeatmapMode, setIsHeatmapMode] = useState(false);
+    const [heatmapRadius, setHeatmapRadius] = useState(50);
     const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+
+    // ▼▼▼ 追加: ページネーション用State ▼▼▼
+    const [currentPage, setCurrentPage] = useState(1);
 
     useEffect(() => {
         const fetchPosts = async () => {
-            const { data, error } = await supabase.from('hazard_posts').select('*').order('created_at', { ascending: false });
+            // ▼▼▼ 修正: 1000件制限を解除し、最大10,000件まで取得するように設定 ▼▼▼
+            const { data, error } = await supabase
+                .from('hazard_posts')
+                .select('*')
+                .order('created_at', { ascending: false }) // 新しい順
+                .range(0, 10000); // 0〜10000件目まで取得
+
             if (error) {
                 toast.error('データの取得に失敗しました');
             } else {
@@ -43,7 +53,6 @@ export default function AdminPage() {
         fetchPosts();
     }, []);
 
-    // 位置情報の復元
     useEffect(() => {
         const savedPos = localStorage.getItem(ADMIN_STORAGE_KEY);
         if (savedPos) {
@@ -70,7 +79,19 @@ export default function AdminPage() {
             if (cityId) tempPosts = tempPosts.filter((post) => post.city_code === cityId);
         }
         setFilteredPosts(tempPosts);
+        setCurrentPage(1); // フィルタ条件が変わったら1ページ目に戻す
     }, [selectedReasons, currentCityKey, allPosts]);
+
+    // ▼▼▼ 追加: ページネーション計算ロジック ▼▼▼
+    const totalPages = Math.ceil(filteredPosts.length / ITEMS_PER_PAGE);
+    const paginatedPosts = filteredPosts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+    const handlePageChange = (newPage: number) => {
+        if (newPage >= 1 && newPage <= totalPages) {
+            setCurrentPage(newPage);
+        }
+    };
+    // ▲▲▲ 追加ここまで ▲▲▲
 
     const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const cityKey = e.target.value;
@@ -122,10 +143,20 @@ export default function AdminPage() {
         setPreviewImageUrl(null);
     };
 
-    return (
-        <main style={{ width: '100%', height: '100vh', display: 'flex', fontFamily: '"Helvetica Neue", Arial, sans-serif', overflow: 'hidden' }}>
-            <Toaster position="top-right" />
+    const handlePostUpdate = (postId: number, newCount: number) => {
+        setAllPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, empathy_count: newCount } : p)));
+    };
 
+    return (
+        <main
+            style={{
+                width: '100%',
+                height: '100vh',
+                display: 'flex',
+                fontFamily: '"Helvetica Neue", Arial, sans-serif',
+                overflow: 'hidden'
+            }}
+        >
             <aside
                 style={{
                     width: '280px',
@@ -158,6 +189,7 @@ export default function AdminPage() {
                         </div>
                     </div>
 
+                    {/* ▼▼▼ 順序入れ替え: 表示エリア選択を上に ▼▼▼ */}
                     <div>
                         <label style={{ display: 'block', fontSize: '13px', color: '#bdc3c7', marginBottom: '8px' }}>表示エリア選択</label>
                         <select
@@ -181,6 +213,67 @@ export default function AdminPage() {
                             ))}
                         </select>
                     </div>
+
+                    {/* ▼▼▼ 順序入れ替え: 可視化モードをその下に ▼▼▼ */}
+                    <div>
+                        <label style={{ display: 'block', fontSize: '13px', color: '#bdc3c7', marginBottom: '8px' }}>可視化モード</label>
+                        <button
+                            onClick={() => setIsHeatmapMode(!isHeatmapMode)}
+                            style={{
+                                width: '100%',
+                                padding: '12px',
+                                background: isHeatmapMode ? '#e74c3c' : '#3498db',
+                                border: 'none',
+                                borderRadius: '6px',
+                                color: 'white',
+                                cursor: 'pointer',
+                                fontWeight: 'bold',
+                                fontSize: '14px',
+                                transition: 'all 0.3s',
+                                boxShadow: isHeatmapMode ? '0 0 10px rgba(231, 76, 60, 0.5)' : 'none'
+                            }}
+                        >
+                            {isHeatmapMode ? '🔥 ヒートマップ表示中' : '📍 ピン表示 (通常)'}
+                        </button>
+
+                        {isHeatmapMode && (
+                            <div
+                                style={{
+                                    marginTop: '10px',
+                                    background: '#34495e',
+                                    padding: '10px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #555'
+                                }}
+                            >
+                                <label style={{ display: 'block', fontSize: '12px', color: '#bdc3c7', marginBottom: '6px' }}>
+                                    広がりの強さ (半径)
+                                </label>
+                                <div style={{ display: 'flex', gap: '5px' }}>
+                                    {[25, 50, 80].map((r) => (
+                                        <button
+                                            key={r}
+                                            onClick={() => setHeatmapRadius(r)}
+                                            style={{
+                                                flex: 1,
+                                                padding: '6px',
+                                                fontSize: '12px',
+                                                border: '1px solid #777',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                background: heatmapRadius === r ? '#fff' : 'transparent',
+                                                color: heatmapRadius === r ? '#333' : '#fff',
+                                                fontWeight: heatmapRadius === r ? 'bold' : 'normal'
+                                            }}
+                                        >
+                                            {r === 25 ? '小' : r === 50 ? '中' : '大'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    {/* ▲▲▲ 入れ替えここまで ▲▲▲ */}
 
                     <div>
                         <label style={{ display: 'block', fontSize: '13px', color: '#bdc3c7', marginBottom: '8px' }}>地図表示モード</label>
@@ -292,7 +385,7 @@ export default function AdminPage() {
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <div style={{ flex: '0 0 60%', position: 'relative', borderBottom: '1px solid #ddd' }}>
                     <HazardMap
-                        posts={filteredPosts}
+                        posts={filteredPosts} // 地図には全件データを渡す
                         centerPos={center}
                         zoomLevel={zoom}
                         onMapChange={handleMapChange}
@@ -300,6 +393,9 @@ export default function AdminPage() {
                         // @ts-ignore
                         selectedCityId={currentCityKey ? CITIES[currentCityKey].id : null}
                         isAdmin={true}
+                        onPostUpdate={handlePostUpdate}
+                        showHeatmap={isHeatmapMode}
+                        heatmapRadius={heatmapRadius}
                     />
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto', background: '#f0f2f5', padding: '20px' }}>
@@ -309,134 +405,194 @@ export default function AdminPage() {
                             borderRadius: '8px',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                             overflow: 'hidden',
-                            border: '1px solid #e1e4e8'
+                            border: '1px solid #e1e4e8',
+                            display: 'flex',
+                            flexDirection: 'column'
                         }}
                     >
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                            <thead style={{ background: '#34495e' }}>
-                                <tr>
-                                    <th style={{ padding: '14px', textAlign: 'left', color: '#fff', fontWeight: '600' }}>ID</th>
-                                    <th style={{ padding: '14px', textAlign: 'left', color: '#fff', fontWeight: '600' }}>不安</th>
-                                    <th style={{ padding: '14px', textAlign: 'left', color: '#fff', fontWeight: '600' }}>住所</th>
-                                    <th style={{ padding: '14px', textAlign: 'left', color: '#fff', fontWeight: '600' }}>タグ</th>
-                                    <th style={{ padding: '14px', textAlign: 'center', color: '#fff', fontWeight: '600' }}>同感</th>
-                                    <th style={{ padding: '14px', textAlign: 'center', color: '#fff', fontWeight: '600' }}>日時</th>
-                                    <th style={{ padding: '14px', textAlign: 'center', color: '#fff', fontWeight: '600' }}>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredPosts.map((post, index) => (
-                                    <tr key={post.id} style={{ borderBottom: '1px solid #eee', background: index % 2 === 0 ? '#fff' : '#f9f9f9' }}>
-                                        <td style={{ padding: '12px 14px', color: '#555' }}>{post.id}</td>
-                                        <td style={{ padding: '12px 14px', fontWeight: 'bold', color: '#2c3e50' }}>{post.reason}</td>
-                                        <td
-                                            style={{
-                                                padding: '12px 14px',
-                                                color: '#333',
-                                                maxWidth: '200px',
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis'
-                                            }}
-                                        >
-                                            {post.address || '-'}
-                                        </td>
-                                        <td style={{ padding: '12px 14px', color: '#555' }}>{post.tags?.join(', ')}</td>
-                                        <td style={{ padding: '12px 14px', textAlign: 'center', color: '#2c3e50', fontWeight: 'bold' }}>
-                                            {post.empathy_count}
-                                        </td>
-                                        <td style={{ padding: '12px 14px', textAlign: 'center', color: '#666' }}>
-                                            {new Date(post.created_at).toLocaleDateString()}
-                                        </td>
-                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                                {/* ▼▼▼ 移動ボタン (アイコン化) ▼▼▼ */}
-                                                <button
-                                                    onClick={() => handleJumpToPost(post.lat, post.lng)}
-                                                    style={{
-                                                        padding: '6px 10px',
-                                                        background: '#3498db',
-                                                        border: '1px solid #2980b9',
-                                                        color: 'white',
-                                                        borderRadius: '4px',
-                                                        cursor: 'pointer',
-                                                        fontSize: '12px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        transition: 'all 0.2s ease'
-                                                    }}
-                                                    title="地図へ移動" // ツールチップ
-                                                >
-                                                    <svg
-                                                        width="16"
-                                                        height="16"
-                                                        viewBox="0 0 24 24"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        strokeWidth="2"
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                    >
-                                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 0 18 0z" />
-                                                        <circle cx="12" cy="10" r="3" />
-                                                    </svg>
-                                                </button>
-                                                {/* ▲▲▲ 修正ここまで ▲▲▲ */}
-
-                                                {/* 写真ボタン */}
-                                                <button
-                                                    onClick={() => handleShowPhoto(post.image_url)}
-                                                    disabled={!post.image_url}
-                                                    style={{
-                                                        padding: '6px 10px',
-                                                        background: post.image_url ? '#3498db' : '#f0f2f5',
-                                                        border: post.image_url ? '1px solid #2980b9' : '1px solid #dce0e5',
-                                                        color: post.image_url ? '#ffffff' : '#aab2bd',
-                                                        borderRadius: '4px',
-                                                        cursor: post.image_url ? 'pointer' : 'not-allowed',
-                                                        fontSize: '12px',
-                                                        whiteSpace: 'nowrap',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        transition: 'all 0.2s ease'
-                                                    }}
-                                                    title={post.image_url ? '写真を見る' : '写真はありません'}
-                                                >
-                                                    <svg
-                                                        width="16"
-                                                        height="16"
-                                                        viewBox="0 0 24 24"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        strokeWidth="2"
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                    >
-                                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                                        <circle cx="8.5" cy="8.5" r="1.5" />
-                                                        <polyline points="21 15 16 10 5 21" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {filteredPosts.length === 0 && (
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                <thead style={{ background: '#34495e' }}>
                                     <tr>
-                                        <td colSpan={7} style={{ padding: '30px', textAlign: 'center', color: '#999' }}>
-                                            データがありません
-                                        </td>
+                                        <th style={{ padding: '14px', textAlign: 'left', color: '#fff', fontWeight: '600' }}>ID</th>
+                                        <th style={{ padding: '14px', textAlign: 'left', color: '#fff', fontWeight: '600' }}>不安</th>
+                                        <th style={{ padding: '14px', textAlign: 'left', color: '#fff', fontWeight: '600' }}>住所</th>
+                                        <th style={{ padding: '14px', textAlign: 'left', color: '#fff', fontWeight: '600' }}>タグ</th>
+                                        <th style={{ padding: '14px', textAlign: 'center', color: '#fff', fontWeight: '600' }}>同感</th>
+                                        <th style={{ padding: '14px', textAlign: 'center', color: '#fff', fontWeight: '600' }}>日時</th>
+                                        <th style={{ padding: '14px', textAlign: 'center', color: '#fff', fontWeight: '600' }}>操作</th>
                                     </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {/* ▼▼▼ 修正: ページネーション後のデータ(paginatedPosts)を使用 ▼▼▼ */}
+                                    {paginatedPosts.map((post, index) => (
+                                        <tr
+                                            key={post.id}
+                                            style={{ borderBottom: '1px solid #eee', background: index % 2 === 0 ? '#fff' : '#f9f9f9' }}
+                                        >
+                                            <td style={{ padding: '12px 14px', color: '#555' }}>{post.id}</td>
+                                            <td style={{ padding: '12px 14px', fontWeight: 'bold', color: '#2c3e50' }}>{post.reason}</td>
+                                            <td
+                                                style={{
+                                                    padding: '12px 14px',
+                                                    color: '#333',
+                                                    maxWidth: '200px',
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis'
+                                                }}
+                                            >
+                                                {post.address || '-'}
+                                            </td>
+                                            <td style={{ padding: '12px 14px', color: '#555' }}>{post.tags?.join(', ')}</td>
+                                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#2c3e50', fontWeight: 'bold' }}>
+                                                {post.empathy_count}
+                                            </td>
+                                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#666' }}>
+                                                {/* ▼▼▼ 修正: 日時を時分まで表示 ▼▼▼ */}
+                                                {new Date(post.created_at).toLocaleString('ja-JP', {
+                                                    year: 'numeric',
+                                                    month: '2-digit',
+                                                    day: '2-digit',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                })}
+                                                {/* ▲▲▲ 修正ここまで ▲▲▲ */}
+                                            </td>
+                                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                                    <button
+                                                        onClick={() => handleJumpToPost(post.lat, post.lng)}
+                                                        style={{
+                                                            padding: '6px 10px',
+                                                            background: '#3498db',
+                                                            border: '1px solid #2980b9',
+                                                            color: 'white',
+                                                            borderRadius: '4px',
+                                                            cursor: 'pointer',
+                                                            fontSize: '12px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            transition: 'all 0.2s ease'
+                                                        }}
+                                                        title="地図へ移動"
+                                                    >
+                                                        <svg
+                                                            width="16"
+                                                            height="16"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            strokeWidth="2"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                        >
+                                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 0 18 0z" />
+                                                            <circle cx="12" cy="10" r="3" />
+                                                        </svg>
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => handleShowPhoto(post.image_url)}
+                                                        disabled={!post.image_url}
+                                                        style={{
+                                                            padding: '6px 10px',
+                                                            background: post.image_url ? '#3498db' : '#f0f2f5',
+                                                            border: post.image_url ? '1px solid #2980b9' : '1px solid #dce0e5',
+                                                            color: post.image_url ? '#ffffff' : '#aab2bd',
+                                                            borderRadius: '4px',
+                                                            cursor: post.image_url ? 'pointer' : 'not-allowed',
+                                                            fontSize: '12px',
+                                                            whiteSpace: 'nowrap',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            transition: 'all 0.2s ease'
+                                                        }}
+                                                        title={post.image_url ? '写真を見る' : '写真はありません'}
+                                                    >
+                                                        <svg
+                                                            width="16"
+                                                            height="16"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            strokeWidth="2"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                        >
+                                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                                            <circle cx="8.5" cy="8.5" r="1.5" />
+                                                            <polyline points="21 15 16 10 5 21" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {filteredPosts.length === 0 && (
+                                        <tr>
+                                            <td colSpan={7} style={{ padding: '30px', textAlign: 'center', color: '#999' }}>
+                                                データがありません
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* ▼▼▼ 追加: ページネーションUI ▼▼▼ */}
+                        {filteredPosts.length > ITEMS_PER_PAGE && (
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    padding: '15px',
+                                    gap: '15px',
+                                    borderTop: '1px solid #eee',
+                                    background: '#f9f9f9'
+                                }}
+                            >
+                                <button
+                                    onClick={() => handlePageChange(currentPage - 1)}
+                                    disabled={currentPage === 1}
+                                    style={{
+                                        padding: '8px 15px',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '4px',
+                                        background: currentPage === 1 ? '#eee' : 'white',
+                                        color: currentPage === 1 ? '#aaa' : '#333',
+                                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+                                    }}
+                                >
+                                    前へ
+                                </button>
+                                <span style={{ fontSize: '14px', color: '#555', fontWeight: 'bold' }}>
+                                    {currentPage} / {totalPages} ページ
+                                </span>
+                                <button
+                                    onClick={() => handlePageChange(currentPage + 1)}
+                                    disabled={currentPage === totalPages}
+                                    style={{
+                                        padding: '8px 15px',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '4px',
+                                        background: currentPage === totalPages ? '#eee' : 'white',
+                                        color: currentPage === totalPages ? '#aaa' : '#333',
+                                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
+                                    }}
+                                >
+                                    次へ
+                                </button>
+                            </div>
+                        )}
+                        {/* ▲▲▲ 追加ここまで ▲▲▲ */}
                     </div>
                 </div>
             </div>
 
-            {/* 画面中央への拡大表示用モーダル */}
             {previewImageUrl && (
                 <div
                     onClick={closePreview}

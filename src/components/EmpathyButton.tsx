@@ -7,20 +7,24 @@ import toast from 'react-hot-toast';
 type Props = {
     postId: number;
     initialCount: number;
-    postUserId: string; // 投稿者のID（自演防止用）
-    // currentUserId は削除（内部で取得するため）
+    postUserId: string;
+    onEmpathy?: (newCount: number) => void;
 };
 
-export default function EmpathyButton({ postId, initialCount, postUserId }: Props) {
+export default function EmpathyButton({ postId, initialCount, postUserId, onEmpathy }: Props) {
     const [count, setCount] = useState(initialCount);
     const [hasEmpathized, setHasEmpathized] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [myUserId, setMyUserId] = useState<string | null>(null);
 
-    // マウント時に現在の状態を確認
+    // ▼▼▼ 追加: 親データ(initialCount)が更新されたら、表示(count)も同期する ▼▼▼
+    useEffect(() => {
+        setCount(initialCount);
+    }, [initialCount]);
+    // ▲▲▲ 追加ここまで ▲▲▲
+
     useEffect(() => {
         const checkStatus = async () => {
-            // 1. まず現在のユーザーを取得（セッションがあれば）
             const {
                 data: { session }
             } = await supabase.auth.getSession();
@@ -28,7 +32,6 @@ export default function EmpathyButton({ postId, initialCount, postUserId }: Prop
 
             if (userId) {
                 setMyUserId(userId);
-                // 2. 既に同感済みかチェック
                 const { data } = await supabase.from('hazard_empathies').select('id').eq('post_id', postId).eq('user_id', userId).maybeSingle();
 
                 if (data) setHasEmpathized(true);
@@ -38,7 +41,6 @@ export default function EmpathyButton({ postId, initialCount, postUserId }: Prop
     }, [postId]);
 
     const handleClick = async () => {
-        // 自分の投稿チェック（IDがまだロードされてない場合は後続処理でも弾くが、念のためUI側でもチェック）
         if (myUserId && myUserId === postUserId) {
             toast('自分の投稿には同感できません', { icon: '🙅‍♂️' });
             return;
@@ -47,36 +49,26 @@ export default function EmpathyButton({ postId, initialCount, postUserId }: Prop
         setIsLoading(true);
 
         try {
-            // ---------------------------------------------------------
-            // 1. ユーザーIDの確保
-            // ---------------------------------------------------------
             let targetUserId = myUserId;
 
             if (!targetUserId) {
-                // IDがない＝まだ匿名ログインが完了していない or 初回
-                // その場でログインを試みる
                 const { data, error } = await supabase.auth.signInAnonymously();
                 if (error || !data.user) {
                     throw new Error('認証に失敗しました');
                 }
                 targetUserId = data.user.id;
-                setMyUserId(targetUserId); // ステートも更新
+                setMyUserId(targetUserId);
             }
 
-            // 念押し：自分の投稿ならここでストップ
             if (targetUserId === postUserId) {
                 toast('自分の投稿には同感できません', { icon: '🙅‍♂️' });
                 setIsLoading(false);
                 return;
             }
 
-            // ---------------------------------------------------------
-            // 2. 同感データの登録
-            // ---------------------------------------------------------
             const { error } = await supabase.from('hazard_empathies').insert([{ post_id: postId, user_id: targetUserId }]);
 
             if (error) {
-                // エラーコード 23505 = 一意制約違反（すでに登録済み）
                 if (error.code === '23505') {
                     setHasEmpathized(true);
                     toast('既に同感済みです');
@@ -85,8 +77,11 @@ export default function EmpathyButton({ postId, initialCount, postUserId }: Prop
                     toast.error('通信エラーが発生しました');
                 }
             } else {
-                // 成功！
-                setCount((prev) => prev + 1);
+                const newCount = count + 1;
+                setCount(newCount);
+                if (onEmpathy) {
+                    onEmpathy(newCount);
+                }
                 setHasEmpathized(true);
                 toast('同感しました！', { icon: '✋' });
             }
@@ -121,10 +116,10 @@ export default function EmpathyButton({ postId, initialCount, postUserId }: Prop
                 }}
             >
                 <span>{hasEmpathized ? '✋ 同感済み' : '✋ 同感'}</span>
+                {/* もし数字を消したい場合は、下の行を削除すればOKです */}
                 <span style={{ fontWeight: 'bold' }}>{count}</span>
             </button>
 
-            {/* 自分の投稿の場合の補足 */}
             {myUserId && myUserId === postUserId && <span style={{ fontSize: '10px', color: '#999', marginLeft: '8px' }}>※自分の投稿</span>}
         </div>
     );
