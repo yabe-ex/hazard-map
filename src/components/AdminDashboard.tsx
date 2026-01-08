@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
-import { useRouter } from 'next/navigation';
 import { REASONS, ReasonType } from '@/constants/reasons';
 import { CITIES } from '@/constants/cities';
 
@@ -13,11 +12,14 @@ const HazardMap = dynamic(() => import('@/components/HazardMap'), {
     ssr: false
 });
 
-const ADMIN_STORAGE_KEY = 'hazard-map-admin-pos';
-const ITEMS_PER_PAGE = 100; // リストの1ページあたりの表示件数
+const ITEMS_PER_PAGE = 100;
 
-export default function AdminPage() {
-    const router = useRouter();
+type AdminDashboardProps = {
+    fixedCityCode?: string;
+    allowFiltering?: boolean;
+};
+
+export default function AdminDashboard({ fixedCityCode, allowFiltering = true }: AdminDashboardProps) {
     const [allPosts, setAllPosts] = useState<any[]>([]);
     const [filteredPosts, setFilteredPosts] = useState<any[]>([]);
     const [selectedReasons, setSelectedReasons] = useState<ReasonType[]>([]);
@@ -30,17 +32,25 @@ export default function AdminPage() {
     const [heatmapRadius, setHeatmapRadius] = useState(50);
     const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
-    // ▼▼▼ 追加: ページネーション用State ▼▼▼
     const [currentPage, setCurrentPage] = useState(1);
+
+    const storageKey = fixedCityCode ? `hazard-map-admin-pos-${fixedCityCode}` : 'hazard-map-admin-pos-global';
+
+    useEffect(() => {
+        if (fixedCityCode) {
+            const entry = Object.entries(CITIES).find(([_, city]) => city.id === fixedCityCode);
+            if (entry) {
+                const [key, city] = entry;
+                setCurrentCityKey(key);
+                setCenter({ lat: city.lat, lng: city.lng });
+                setZoom(city.zoom);
+            }
+        }
+    }, [fixedCityCode]);
 
     useEffect(() => {
         const fetchPosts = async () => {
-            // ▼▼▼ 修正: 1000件制限を解除し、最大10,000件まで取得するように設定 ▼▼▼
-            const { data, error } = await supabase
-                .from('hazard_posts')
-                .select('*')
-                .order('created_at', { ascending: false }) // 新しい順
-                .range(0, 10000); // 0〜10000件目まで取得
+            const { data, error } = await supabase.from('hazard_posts').select('*').order('created_at', { ascending: false }).range(0, 10000);
 
             if (error) {
                 toast.error('データの取得に失敗しました');
@@ -54,7 +64,7 @@ export default function AdminPage() {
     }, []);
 
     useEffect(() => {
-        const savedPos = localStorage.getItem(ADMIN_STORAGE_KEY);
+        const savedPos = localStorage.getItem(storageKey);
         if (savedPos) {
             try {
                 const parsed = JSON.parse(savedPos);
@@ -66,23 +76,25 @@ export default function AdminPage() {
                 console.error(e);
             }
         }
-    }, []);
+    }, [storageKey]);
 
     useEffect(() => {
         let tempPosts = allPosts;
         if (selectedReasons.length > 0) tempPosts = tempPosts.filter((post) => selectedReasons.includes(post.reason));
         else tempPosts = [];
 
-        if (currentCityKey) {
+        if (fixedCityCode) {
+            tempPosts = tempPosts.filter((post) => post.city_code === fixedCityCode);
+        } else if (currentCityKey) {
             // @ts-ignore
             const cityId = CITIES[currentCityKey]?.id;
             if (cityId) tempPosts = tempPosts.filter((post) => post.city_code === cityId);
         }
-        setFilteredPosts(tempPosts);
-        setCurrentPage(1); // フィルタ条件が変わったら1ページ目に戻す
-    }, [selectedReasons, currentCityKey, allPosts]);
 
-    // ▼▼▼ 追加: ページネーション計算ロジック ▼▼▼
+        setFilteredPosts(tempPosts);
+        setCurrentPage(1);
+    }, [selectedReasons, currentCityKey, allPosts, fixedCityCode]);
+
     const totalPages = Math.ceil(filteredPosts.length / ITEMS_PER_PAGE);
     const paginatedPosts = filteredPosts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
@@ -91,7 +103,6 @@ export default function AdminPage() {
             setCurrentPage(newPage);
         }
     };
-    // ▲▲▲ 追加ここまで ▲▲▲
 
     const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const cityKey = e.target.value;
@@ -100,7 +111,7 @@ export default function AdminPage() {
             const defaultCenter = { lat: 35.85, lng: 139.5 };
             setCenter(defaultCenter);
             setZoom(11);
-            localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify({ ...defaultCenter, zoom: 11 }));
+            localStorage.setItem(storageKey, JSON.stringify({ ...defaultCenter, zoom: 11 }));
             return;
         }
         // @ts-ignore
@@ -108,7 +119,7 @@ export default function AdminPage() {
         if (city) {
             setCenter({ lat: city.lat, lng: city.lng });
             setZoom(city.zoom);
-            localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify({ lat: city.lat, lng: city.lng, zoom: city.zoom }));
+            localStorage.setItem(storageKey, JSON.stringify({ lat: city.lat, lng: city.lng, zoom: city.zoom }));
         }
     };
 
@@ -119,13 +130,13 @@ export default function AdminPage() {
     const handleJumpToPost = (lat: number, lng: number) => {
         setCenter({ lat, lng });
         setZoom(16);
-        localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify({ lat, lng, zoom: 16 }));
+        localStorage.setItem(storageKey, JSON.stringify({ lat, lng, zoom: 16 }));
     };
 
     const handleMapChange = (lat: number, lng: number, newZoom: number) => {
         setCenter({ lat, lng });
         setZoom(newZoom);
-        localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify({ lat, lng, zoom: newZoom }));
+        localStorage.setItem(storageKey, JSON.stringify({ lat, lng, zoom: newZoom }));
     };
 
     const handleShowPhoto = (imageUrl?: string) => {
@@ -147,16 +158,15 @@ export default function AdminPage() {
         setAllPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, empathy_count: newCount } : p)));
     };
 
+    const displayCityName = fixedCityCode
+        ? Object.values(CITIES).find((c) => c.id === fixedCityCode)?.name
+        : currentCityKey
+        ? // @ts-ignore
+          CITIES[currentCityKey]?.name
+        : '全域';
+
     return (
-        <main
-            style={{
-                width: '100%',
-                height: '100vh',
-                display: 'flex',
-                fontFamily: '"Helvetica Neue", Arial, sans-serif',
-                overflow: 'hidden'
-            }}
-        >
+        <div style={{ width: '100%', height: '100vh', display: 'flex', fontFamily: 'sans-serif', overflow: 'hidden' }}>
             <aside
                 style={{
                     width: '280px',
@@ -169,7 +179,9 @@ export default function AdminPage() {
                 }}
             >
                 <div style={{ padding: '20px', borderBottom: '1px solid #34495e' }}>
-                    <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>管理者メニュー</h1>
+                    <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>
+                        {fixedCityCode ? `${displayCityName} 自治体管理画面` : '総合管理画面'}
+                    </h1>
                 </div>
                 <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '25px', overflowY: 'auto' }}>
                     <div
@@ -189,32 +201,32 @@ export default function AdminPage() {
                         </div>
                     </div>
 
-                    {/* ▼▼▼ 順序入れ替え: 表示エリア選択を上に ▼▼▼ */}
-                    <div>
-                        <label style={{ display: 'block', fontSize: '13px', color: '#bdc3c7', marginBottom: '8px' }}>表示エリア選択</label>
-                        <select
-                            value={currentCityKey}
-                            onChange={handleCityChange}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                borderRadius: '6px',
-                                border: '1px solid #555',
-                                background: '#34495e',
-                                color: 'white',
-                                fontSize: '14px'
-                            }}
-                        >
-                            <option value="">未選択（全域）</option>
-                            {Object.entries(CITIES).map(([key, city]) => (
-                                <option key={key} value={key}>
-                                    埼玉県 {city.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                    {allowFiltering && (
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', color: '#bdc3c7', marginBottom: '8px' }}>表示エリア選択</label>
+                            <select
+                                value={currentCityKey}
+                                onChange={handleCityChange}
+                                style={{
+                                    width: '100%',
+                                    padding: '10px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #555',
+                                    background: '#34495e',
+                                    color: 'white',
+                                    fontSize: '14px'
+                                }}
+                            >
+                                <option value="">未選択（全域）</option>
+                                {Object.entries(CITIES).map(([key, city]) => (
+                                    <option key={key} value={key}>
+                                        埼玉県 {city.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
-                    {/* ▼▼▼ 順序入れ替え: 可視化モードをその下に ▼▼▼ */}
                     <div>
                         <label style={{ display: 'block', fontSize: '13px', color: '#bdc3c7', marginBottom: '8px' }}>可視化モード</label>
                         <button
@@ -235,17 +247,8 @@ export default function AdminPage() {
                         >
                             {isHeatmapMode ? '🔥 ヒートマップ表示中' : '📍 ピン表示 (通常)'}
                         </button>
-
                         {isHeatmapMode && (
-                            <div
-                                style={{
-                                    marginTop: '10px',
-                                    background: '#34495e',
-                                    padding: '10px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #555'
-                                }}
-                            >
+                            <div style={{ marginTop: '10px', background: '#34495e', padding: '10px', borderRadius: '6px', border: '1px solid #555' }}>
                                 <label style={{ display: 'block', fontSize: '12px', color: '#bdc3c7', marginBottom: '6px' }}>
                                     広がりの強さ (半径)
                                 </label>
@@ -273,7 +276,6 @@ export default function AdminPage() {
                             </div>
                         )}
                     </div>
-                    {/* ▲▲▲ 入れ替えここまで ▲▲▲ */}
 
                     <div>
                         <label style={{ display: 'block', fontSize: '13px', color: '#bdc3c7', marginBottom: '8px' }}>地図表示モード</label>
@@ -287,8 +289,7 @@ export default function AdminPage() {
                                     color: 'white',
                                     borderRadius: '6px',
                                     cursor: 'pointer',
-                                    fontSize: '13px',
-                                    transition: 'all 0.2s'
+                                    fontSize: '13px'
                                 }}
                             >
                                 標準 (OSM)
@@ -302,11 +303,10 @@ export default function AdminPage() {
                                     color: 'white',
                                     borderRadius: '6px',
                                     cursor: 'pointer',
-                                    fontSize: '13px',
-                                    transition: 'all 0.2s'
+                                    fontSize: '13px'
                                 }}
                             >
-                                シンプル (Positron)
+                                シンプル
                             </button>
                             <button
                                 onClick={() => setMapMode('satellite')}
@@ -317,11 +317,10 @@ export default function AdminPage() {
                                     color: 'white',
                                     borderRadius: '6px',
                                     cursor: 'pointer',
-                                    fontSize: '13px',
-                                    transition: 'all 0.2s'
+                                    fontSize: '13px'
                                 }}
                             >
-                                航空写真 (Esri)
+                                航空写真
                             </button>
                         </div>
                     </div>
@@ -363,9 +362,10 @@ export default function AdminPage() {
                     </div>
 
                     <div style={{ marginTop: 'auto', borderTop: '1px solid #34495e', paddingTop: '20px' }}>
-                        <button
-                            onClick={() => router.push('/')}
+                        <a
+                            href="/"
                             style={{
+                                display: 'block',
                                 width: '100%',
                                 padding: '12px',
                                 background: 'transparent',
@@ -373,11 +373,13 @@ export default function AdminPage() {
                                 color: '#ecf0f1',
                                 borderRadius: '6px',
                                 cursor: 'pointer',
-                                fontSize: '14px'
+                                fontSize: '14px',
+                                textAlign: 'center',
+                                textDecoration: 'none'
                             }}
                         >
                             ← 一般ページへ戻る
-                        </button>
+                        </a>
                     </div>
                 </div>
             </aside>
@@ -385,13 +387,13 @@ export default function AdminPage() {
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <div style={{ flex: '0 0 60%', position: 'relative', borderBottom: '1px solid #ddd' }}>
                     <HazardMap
-                        posts={filteredPosts} // 地図には全件データを渡す
+                        posts={filteredPosts}
                         centerPos={center}
                         zoomLevel={zoom}
                         onMapChange={handleMapChange}
                         mapMode={mapMode}
                         // @ts-ignore
-                        selectedCityId={currentCityKey ? CITIES[currentCityKey].id : null}
+                        selectedCityId={fixedCityCode || (currentCityKey ? CITIES[currentCityKey]?.id : null)}
                         isAdmin={true}
                         onPostUpdate={handlePostUpdate}
                         showHeatmap={isHeatmapMode}
@@ -424,7 +426,6 @@ export default function AdminPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {/* ▼▼▼ 修正: ページネーション後のデータ(paginatedPosts)を使用 ▼▼▼ */}
                                     {paginatedPosts.map((post, index) => (
                                         <tr
                                             key={post.id}
@@ -449,7 +450,6 @@ export default function AdminPage() {
                                                 {post.empathy_count}
                                             </td>
                                             <td style={{ padding: '12px 14px', textAlign: 'center', color: '#666' }}>
-                                                {/* ▼▼▼ 修正: 日時を時分まで表示 ▼▼▼ */}
                                                 {new Date(post.created_at).toLocaleString('ja-JP', {
                                                     year: 'numeric',
                                                     month: '2-digit',
@@ -457,7 +457,6 @@ export default function AdminPage() {
                                                     hour: '2-digit',
                                                     minute: '2-digit'
                                                 })}
-                                                {/* ▲▲▲ 修正ここまで ▲▲▲ */}
                                             </td>
                                             <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
@@ -470,29 +469,12 @@ export default function AdminPage() {
                                                             color: 'white',
                                                             borderRadius: '4px',
                                                             cursor: 'pointer',
-                                                            fontSize: '12px',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            transition: 'all 0.2s ease'
+                                                            fontSize: '12px'
                                                         }}
                                                         title="地図へ移動"
                                                     >
-                                                        <svg
-                                                            width="16"
-                                                            height="16"
-                                                            viewBox="0 0 24 24"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            strokeWidth="2"
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                        >
-                                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 0 18 0z" />
-                                                            <circle cx="12" cy="10" r="3" />
-                                                        </svg>
+                                                        🗺️
                                                     </button>
-
                                                     <button
                                                         onClick={() => handleShowPhoto(post.image_url)}
                                                         disabled={!post.image_url}
@@ -503,29 +485,11 @@ export default function AdminPage() {
                                                             color: post.image_url ? '#ffffff' : '#aab2bd',
                                                             borderRadius: '4px',
                                                             cursor: post.image_url ? 'pointer' : 'not-allowed',
-                                                            fontSize: '12px',
-                                                            whiteSpace: 'nowrap',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            transition: 'all 0.2s ease'
+                                                            fontSize: '12px'
                                                         }}
-                                                        title={post.image_url ? '写真を見る' : '写真はありません'}
+                                                        title="写真を見る"
                                                     >
-                                                        <svg
-                                                            width="16"
-                                                            height="16"
-                                                            viewBox="0 0 24 24"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            strokeWidth="2"
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                        >
-                                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                                            <circle cx="8.5" cy="8.5" r="1.5" />
-                                                            <polyline points="21 15 16 10 5 21" />
-                                                        </svg>
+                                                        📷
                                                     </button>
                                                 </div>
                                             </td>
@@ -541,8 +505,6 @@ export default function AdminPage() {
                                 </tbody>
                             </table>
                         </div>
-
-                        {/* ▼▼▼ 追加: ページネーションUI ▼▼▼ */}
                         {filteredPosts.length > ITEMS_PER_PAGE && (
                             <div
                                 style={{
@@ -588,7 +550,6 @@ export default function AdminPage() {
                                 </button>
                             </div>
                         )}
-                        {/* ▲▲▲ 追加ここまで ▲▲▲ */}
                     </div>
                 </div>
             </div>
@@ -653,6 +614,6 @@ export default function AdminPage() {
                     </div>
                 </div>
             )}
-        </main>
+        </div>
     );
 }
