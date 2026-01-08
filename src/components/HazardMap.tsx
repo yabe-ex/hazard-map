@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import L from 'leaflet';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import EmpathyButton from './EmpathyButton';
 import dynamic from 'next/dynamic';
 
@@ -34,8 +34,7 @@ const MAP_STYLES = {
     satellite: {
         name: '航空写真 (Esri)',
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attribution:
-            'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri...'
     }
 };
 
@@ -52,6 +51,9 @@ type Post = {
     empathy_count: number;
     city_code?: string;
     image_url?: string;
+    // 管理者用のプロパティは地図表示には影響させないため削除、または無視する
+    admin_display_color?: string;
+    admin_is_white?: boolean;
 };
 
 type Props = {
@@ -65,75 +67,66 @@ type Props = {
     isAdmin?: boolean;
     onPostUpdate?: (postId: number, newCount: number) => void;
     showHeatmap?: boolean;
-    // ▼▼▼ 追加: 半径を受け取るProps ▼▼▼
     heatmapRadius?: number;
+    onAdminSelectPost?: (post: Post) => void;
 };
 
+// ▼▼▼ 修正: アイコン生成は常に「reason（不安理由）」に基づく色で行う ▼▼▼
 const createCustomIcon = (reason: string, count: number) => {
-    let color = 'grey';
-    switch (reason) {
-        case '暗い':
-            color = 'violet';
-            break;
-        case '見通しが悪い':
-            color = 'gold';
-            break;
-        case '人通りが少ない':
-            color = 'blue';
-            break;
-        case '歩道が狭い':
-            color = 'green';
-            break;
-        default:
-            color = 'grey';
-            break;
+    try {
+        // 通常のカテゴリ色分け
+        let color = 'grey';
+        switch (reason) {
+            case '暗い':
+                color = 'violet';
+                break;
+            case '見通しが悪い':
+                color = 'gold';
+                break;
+            case '人通りが少ない':
+                color = 'blue';
+                break;
+            case '歩道が狭い':
+                color = 'green';
+                break;
+            default:
+                color = 'grey';
+                break;
+        }
+
+        const badgeHtml =
+            count > 0
+                ? `<div style="position: absolute; top: -6px; right: -6px; background-color: #ff4d4f; color: white; border-radius: 10px; min-width: 20px; height: 20px; padding: 0 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 10;">${
+                      count > 99 ? '99+' : count
+                  }</div>`
+                : '';
+
+        return L.divIcon({
+            className: '',
+            html: `<div style="position: relative; width: 25px; height: 41px;">
+                    <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png" style="width: 25px; height: 41px; display: block;" alt="marker" />
+                    ${badgeHtml}
+                   </div>`,
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34]
+        });
+    } catch (e) {
+        console.error('Icon creation failed', e);
+        return L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41]
+        });
     }
-
-    const badgeHtml =
-        count > 0
-            ? `<div style="
-            position: absolute;
-            top: -6px;
-            right: -6px;
-            background-color: #ff4d4f;
-            color: white;
-            border-radius: 10px;
-            min-width: 20px;
-            height: 20px;
-            padding: 0 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            font-weight: bold;
-            border: 2px solid white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            z-index: 10;
-          ">${count > 99 ? '99+' : count}</div>`
-            : '';
-
-    return L.divIcon({
-        className: '',
-        html: `
-            <div style="position: relative; width: 25px; height: 41px;">
-                <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png"
-                     style="width: 25px; height: 41px; display: block;"
-                     alt="marker" />
-                ${badgeHtml}
-            </div>
-        `,
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34]
-    });
 };
 
 function MapUpdater({ center, zoom }: { center: { lat: number; lng: number }; zoom: number }) {
     const map = useMap();
     useEffect(() => {
+        if (!center || isNaN(center.lat) || isNaN(center.lng)) return;
         const currentCenter = map.getCenter();
         const currentZoom = map.getZoom();
-
         const dist = Math.abs(currentCenter.lat - center.lat) + Math.abs(currentCenter.lng - center.lng);
         if (dist > 0.000001 || currentZoom !== zoom) {
             map.flyTo([center.lat, center.lng], zoom, { duration: 1.5 });
@@ -144,20 +137,8 @@ function MapUpdater({ center, zoom }: { center: { lat: number; lng: number }; zo
 
 function MapController({ onMapChange }: { onMapChange?: (lat: number, lng: number, zoom: number) => void }) {
     const map = useMapEvents({
-        moveend: () => {
-            if (onMapChange) {
-                const center = map.getCenter();
-                const zoom = map.getZoom();
-                onMapChange(center.lat, center.lng, zoom);
-            }
-        },
-        zoomend: () => {
-            if (onMapChange) {
-                const center = map.getCenter();
-                const zoom = map.getZoom();
-                onMapChange(center.lat, center.lng, zoom);
-            }
-        }
+        moveend: () => onMapChange?.(map.getCenter().lat, map.getCenter().lng, map.getZoom()),
+        zoomend: () => onMapChange?.(map.getCenter().lat, map.getCenter().lng, map.getZoom())
     });
     return null;
 }
@@ -168,37 +149,15 @@ function CityBoundary({ cityId }: { cityId: string }) {
     useEffect(() => {
         if (!cityId) return;
         setGeoData(null);
-
         const url = `https://raw.githubusercontent.com/niiyz/JapanCityGeoJson/master/geojson/11/${cityId}.json`;
-
         fetch(url)
-            .then((res) => {
-                if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
-                return res.json();
-            })
-            .then((data) => {
-                setGeoData(data);
-            })
-            .catch((err) => {
-                console.error('Failed to fetch GeoJSON:', err);
-            });
+            .then((res) => res.json())
+            .then((data) => setGeoData(data))
+            .catch(console.error);
     }, [cityId]);
 
     if (!geoData) return null;
-
-    return (
-        <GeoJSON
-            key={cityId}
-            data={geoData}
-            style={{
-                color: '#1E90FF',
-                weight: 4,
-                opacity: 0.9,
-                fillColor: '#1E90FF',
-                fillOpacity: 0.15
-            }}
-        />
-    );
+    return <GeoJSON key={cityId} data={geoData} style={{ color: '#1E90FF', weight: 4, opacity: 0.9, fillColor: '#1E90FF', fillOpacity: 0.15 }} />;
 }
 
 export default function HazardMap({
@@ -212,34 +171,54 @@ export default function HazardMap({
     isAdmin = false,
     onPostUpdate,
     showHeatmap = false,
-    heatmapRadius = 50 // デフォルト値
+    heatmapRadius = 50,
+    onAdminSelectPost
 }: Props) {
     const currentMode = mapMode && MAP_STYLES[mapMode] ? mapMode : 'standard';
     const tileStyle = MAP_STYLES[currentMode];
 
-    const heatPoints: [number, number, number][] = posts.map((p) => {
-        const intensity = Math.min(1.0, 0.3 + (p.empathy_count || 0) * 0.1);
-        return [p.lat, p.lng, intensity];
-    });
+    const validPosts = useMemo(() => {
+        return posts.filter((p) => p.lat && p.lng && !isNaN(p.lat) && !isNaN(p.lng));
+    }, [posts]);
+
+    const heatPoints: [number, number, number][] = useMemo(() => {
+        return validPosts.map((p) => {
+            const intensity = Math.min(1.0, 0.3 + (p.empathy_count || 0) * 0.1);
+            return [p.lat, p.lng, intensity];
+        });
+    }, [validPosts]);
+
+    const safeCenter = centerPos && !isNaN(centerPos.lat) && !isNaN(centerPos.lng) ? centerPos : { lat: 35.85, lng: 139.5 };
 
     return (
-        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-            <MapContainer center={[centerPos.lat, centerPos.lng]} zoom={zoomLevel} style={{ height: '100%', width: '100%' }}>
+        <div style={{ position: 'relative', width: '100%', height: '100%', background: '#e0e0e0' }}>
+            <MapContainer center={[safeCenter.lat, safeCenter.lng]} zoom={zoomLevel} style={{ height: '100%', width: '100%' }}>
                 <TileLayer attribution={tileStyle.attribution} url={tileStyle.url} />
-
                 {selectedCityId && <CityBoundary cityId={selectedCityId} />}
 
                 {showHeatmap ? (
-                    // ▼▼▼ 修正: 半径を渡す ▼▼▼
                     <HeatmapLayer points={heatPoints} radius={heatmapRadius} />
                 ) : (
                     <MarkerClusterGroup chunkedLoading>
-                        {posts.map((post) => {
+                        {validPosts.map((post) => {
+                            // ▼▼▼ 修正: 管理者かどうかにかかわらず、通常のアイコン生成ロジックを使用 ▼▼▼
                             const icon = createCustomIcon(post.reason, post.empathy_count || 0);
                             const showImage = isAdmin || (currentUserId && post.user_id === currentUserId);
 
                             return (
-                                <Marker key={post.id} position={[post.lat, post.lng]} icon={icon}>
+                                <Marker
+                                    key={post.id}
+                                    position={[post.lat, post.lng]}
+                                    icon={icon}
+                                    eventHandlers={{
+                                        click: () => {
+                                            // 管理者の場合は詳細モーダルを開く
+                                            if (isAdmin && onAdminSelectPost) {
+                                                onAdminSelectPost(post);
+                                            }
+                                        }
+                                    }}
+                                >
                                     <Popup minWidth={200} maxWidth={280}>
                                         <div style={{ fontFamily: 'sans-serif' }}>
                                             <div
@@ -254,7 +233,6 @@ export default function HazardMap({
                                             >
                                                 {post.reason}
                                             </div>
-
                                             {post.image_url && showImage && (
                                                 <div style={{ marginBottom: '8px' }}>
                                                     <img
@@ -269,30 +247,35 @@ export default function HazardMap({
                                                             border: '1px solid #eee'
                                                         }}
                                                     />
-                                                    {!isAdmin && (
-                                                        <div style={{ fontSize: '10px', color: '#888', marginTop: '4px', textAlign: 'right' }}>
-                                                            ※あなただけに表示されています
-                                                        </div>
-                                                    )}
                                                 </div>
                                             )}
-
-                                            {(() => {
-                                                const tags = post.tags || [];
-                                                const times = (post.time_slot || []).map((t) => TIME_LABELS[t]).filter(Boolean);
-                                                const details = [...tags, ...times];
-                                                if (details.length === 0) return null;
-                                                return (
-                                                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>{details.join('・')}</div>
-                                                );
-                                            })()}
-
+                                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                                                {[...(post.tags || []), ...(post.time_slot || []).map((t) => TIME_LABELS[t])].join('・')}
+                                            </div>
                                             <EmpathyButton
                                                 postId={post.id}
                                                 initialCount={post.empathy_count || 0}
                                                 postUserId={post.user_id}
                                                 onEmpathy={(newCount) => onPostUpdate?.(post.id, newCount)}
                                             />
+                                            {isAdmin && (
+                                                <div style={{ marginTop: '10px', textAlign: 'center' }}>
+                                                    <button
+                                                        onClick={() => onAdminSelectPost?.(post)}
+                                                        style={{
+                                                            fontSize: '12px',
+                                                            padding: '4px 8px',
+                                                            background: '#2c3e50',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            borderRadius: '4px',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        管理詳細を開く
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </Popup>
                                 </Marker>
@@ -300,21 +283,13 @@ export default function HazardMap({
                         })}
                     </MarkerClusterGroup>
                 )}
-
-                <MapUpdater center={centerPos} zoom={zoomLevel} />
+                <MapUpdater center={safeCenter} zoom={zoomLevel} />
                 <MapController onMapChange={onMapChange} />
             </MapContainer>
 
             {!showHeatmap && (
                 <div
-                    style={{
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        zIndex: 1000,
-                        pointerEvents: 'none'
-                    }}
+                    style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1000, pointerEvents: 'none' }}
                 >
                     <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="20" cy="20" r="18" stroke="red" strokeWidth="2" strokeDasharray="4 2" />
