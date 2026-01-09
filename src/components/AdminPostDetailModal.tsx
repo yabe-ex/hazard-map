@@ -13,12 +13,36 @@ type Props = {
     cityCodeFilter: string | null;
 };
 
+// URLを検出してリンク化するヘルパー関数
+const renderContentWithLinks = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.split(urlRegex).map((part, index) => {
+        if (part.match(urlRegex)) {
+            return (
+                <a
+                    key={index}
+                    href={part}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#3498db', textDecoration: 'underline' }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {part}
+                </a>
+            );
+        }
+        return part;
+    });
+};
+
 export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, cityCodeFilter }: Props) {
-    const [activeTab, setActiveTab] = useState<'manage'>('manage');
     const [allTags, setAllTags] = useState<AdminTag[]>([]);
     const [attachedTagIds, setAttachedTagIds] = useState<number[]>([]);
     const [memos, setMemos] = useState<AdminMemo[]>([]);
-    const [newMemo, setNewMemo] = useState('');
+
+    const [memoInput, setMemoInput] = useState('');
+    const [editingMemoId, setEditingMemoId] = useState<number | null>(null);
+
     const [newTagName, setNewTagName] = useState('');
     const [newTagColor, setNewTagColor] = useState('#2ecc71');
     const [isLoading, setIsLoading] = useState(false);
@@ -30,11 +54,15 @@ export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, 
             fetchTags();
             fetchAttachedTags();
             fetchMemos();
+            setMemoInput('');
+            setEditingMemoId(null);
         }
     }, [isOpen, post]);
 
     useEffect(() => {
-        memoEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (!editingMemoId) {
+            memoEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
     }, [memos]);
 
     const fetchTags = async () => {
@@ -75,9 +103,10 @@ export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, 
         }
     };
 
-    const sendMemo = async () => {
-        if (!newMemo.trim()) return;
+    const handleSubmitMemo = async () => {
+        if (!memoInput.trim()) return;
         setIsLoading(true);
+
         const {
             data: { user }
         } = await supabase.auth.getUser();
@@ -86,15 +115,53 @@ export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, 
             setIsLoading(false);
             return;
         }
-        const { error } = await supabase.from('admin_memos').insert({ post_id: post.id, user_id: user.id, content: newMemo });
-        if (error) {
-            toast.error('メモの送信に失敗しました');
+
+        if (editingMemoId) {
+            const { error } = await supabase.from('admin_memos').update({ content: memoInput }).eq('id', editingMemoId);
+            if (error) {
+                toast.error('メモの更新に失敗しました');
+            } else {
+                toast.success('メモを更新しました');
+                setMemoInput('');
+                setEditingMemoId(null);
+                fetchMemos();
+            }
         } else {
-            setNewMemo('');
-            fetchMemos();
-            toast.success('メモを保存しました');
+            const { error } = await supabase.from('admin_memos').insert({ post_id: post.id, user_id: user.id, content: memoInput });
+            if (error) {
+                toast.error('メモの送信に失敗しました');
+            } else {
+                toast.success('メモを保存しました');
+                setMemoInput('');
+                fetchMemos();
+            }
         }
         setIsLoading(false);
+    };
+
+    const handleDeleteMemo = async (memoId: number) => {
+        if (!window.confirm('このメモを削除しますか？')) return;
+        const { error } = await supabase.from('admin_memos').delete().eq('id', memoId);
+        if (error) {
+            toast.error('削除に失敗しました');
+        } else {
+            toast.success('メモを削除しました');
+            if (editingMemoId === memoId) {
+                setMemoInput('');
+                setEditingMemoId(null);
+            }
+            fetchMemos();
+        }
+    };
+
+    const handleStartEdit = (memo: AdminMemo) => {
+        setEditingMemoId(memo.id);
+        setMemoInput(memo.content);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingMemoId(null);
+        setMemoInput('');
     };
 
     const createCustomTag = async () => {
@@ -126,7 +193,7 @@ export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, 
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#333' // ▼▼▼ 追加: 全体の文字色を濃い色に強制（ダークモード対策） ▼▼▼
+                color: '#333'
             }}
             onClick={onClose}
         >
@@ -179,13 +246,18 @@ export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, 
                 </div>
 
                 <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-                    {/* 左カラム：基本情報 */}
+                    {/* ▼▼▼ 左カラム：写真・基本情報 ▼▼▼ */}
+                    {/* width: 40% を維持し、写真があれば最上部に表示 */}
                     <div style={{ width: '40%', padding: '20px', borderRight: '1px solid #eee', overflowY: 'auto', background: '#fff' }}>
                         {post.image_url && (
-                            <img
-                                src={post.image_url}
-                                style={{ width: '100%', borderRadius: '6px', marginBottom: '15px', border: '1px solid #ddd' }}
-                            />
+                            <div style={{ marginBottom: '15px' }}>
+                                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#555', marginBottom: '5px' }}>現場写真</div>
+                                <img
+                                    src={post.image_url}
+                                    style={{ width: '100%', borderRadius: '6px', border: '1px solid #ddd', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}
+                                    alt="投稿写真"
+                                />
+                            </div>
                         )}
                         <div style={{ marginBottom: '15px' }}>
                             <h4 style={{ fontSize: '14px', color: '#555', marginBottom: '5px', fontWeight: 'bold' }}>詳細</h4>
@@ -216,9 +288,11 @@ export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, 
                         </div>
                     </div>
 
-                    {/* 右カラム：管理機能 */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fcfcfc' }}>
-                        <div style={{ display: 'flex', borderBottom: '1px solid #ddd' }}>
+                    {/* ▼▼▼ 右カラム：管理機能（メモ欄を拡大） ▼▼▼ */}
+                    {/* flex: 1 で残りの幅を使用。内部も flex column にして高さをフル活用 */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fcfcfc', overflow: 'hidden' }}>
+                        {/* タブヘッダー */}
+                        <div style={{ display: 'flex', borderBottom: '1px solid #ddd', flexShrink: 0 }}>
                             <button
                                 style={{
                                     flex: 1,
@@ -235,9 +309,11 @@ export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, 
                             </button>
                         </div>
 
-                        <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-                            {/* タグ管理 */}
-                            <div style={{ marginBottom: '30px' }}>
+                        {/* コンテンツエリア (スクロール可) */}
+                        {/* ここを flex column にして、下部のメモ欄を flex: 1 で伸ばす */}
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '20px', overflowY: 'hidden' }}>
+                            {/* 1. タグ管理セクション (高さ自動) */}
+                            <div style={{ marginBottom: '20px', flexShrink: 0 }}>
                                 <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '10px', color: '#111' }}>🏷 ステータス・タグ</h3>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '15px' }}>
                                     {allTags.map((tag) => {
@@ -312,15 +388,17 @@ export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, 
                                 </details>
                             </div>
 
-                            {/* メモ・チャット */}
+                            {/* 2. メモ・チャットセクション (残り高さいっぱい) */}
+                            {/* flex: 1 を指定して下まで伸ばす */}
                             <div
                                 style={{
+                                    flex: 1,
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    height: '300px',
                                     border: '1px solid #ddd',
                                     borderRadius: '8px',
-                                    background: 'white'
+                                    background: 'white',
+                                    overflow: 'hidden'
                                 }}
                             >
                                 <div
@@ -330,74 +408,139 @@ export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, 
                                         borderBottom: '1px solid #eee',
                                         fontSize: '13px',
                                         fontWeight: 'bold',
-                                        color: '#333'
+                                        color: '#333',
+                                        flexShrink: 0
                                     }}
                                 >
                                     📝 担当者メモ (履歴)
                                 </div>
+
+                                {/* ログ表示エリア (スクロール) */}
                                 <div style={{ flex: 1, overflowY: 'auto', padding: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                     {memos.length === 0 && (
                                         <div style={{ textAlign: 'center', color: '#666', fontSize: '13px', marginTop: '20px' }}>
                                             メモはまだありません
                                         </div>
                                     )}
-                                    {memos.map((memo) => (
-                                        // ▼▼▼ 修正: メモの背景色と文字色をコントラスト高く設定 ▼▼▼
-                                        <div
-                                            key={memo.id}
-                                            style={{
-                                                background: '#f0f2f5',
-                                                padding: '10px',
-                                                borderRadius: '8px',
-                                                fontSize: '13px',
-                                                border: '1px solid #e1e4e8'
-                                            }}
-                                        >
-                                            <div style={{ fontSize: '11px', color: '#555', marginBottom: '4px', fontWeight: 'bold' }}>
-                                                {new Date(memo.created_at).toLocaleString()}
+                                    {memos.map((memo) => {
+                                        const isEditing = editingMemoId === memo.id;
+                                        return (
+                                            <div
+                                                key={memo.id}
+                                                style={{
+                                                    background: isEditing ? '#fff8e1' : '#f0f2f5',
+                                                    padding: '10px',
+                                                    borderRadius: '8px',
+                                                    fontSize: '13px',
+                                                    border: isEditing ? '2px solid #f1c40f' : '1px solid #e1e4e8',
+                                                    position: 'relative'
+                                                }}
+                                            >
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                                    <span style={{ fontSize: '11px', color: '#555', fontWeight: 'bold' }}>
+                                                        {new Date(memo.created_at).toLocaleString()}
+                                                    </span>
+                                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                                        <button
+                                                            onClick={() => handleStartEdit(memo)}
+                                                            title="編集"
+                                                            style={{
+                                                                border: 'none',
+                                                                background: 'transparent',
+                                                                cursor: 'pointer',
+                                                                fontSize: '14px',
+                                                                padding: 0
+                                                            }}
+                                                        >
+                                                            ✏️
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteMemo(memo.id)}
+                                                            title="削除"
+                                                            style={{
+                                                                border: 'none',
+                                                                background: 'transparent',
+                                                                cursor: 'pointer',
+                                                                fontSize: '14px',
+                                                                padding: 0
+                                                            }}
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.4', color: '#111' }}>
+                                                    {renderContentWithLinks(memo.content)}
+                                                </div>
                                             </div>
-                                            <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.4', color: '#111' }}>{memo.content}</div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                     <div ref={memoEndRef} />
                                 </div>
-                                <div style={{ padding: '10px', borderTop: '1px solid #eee', display: 'flex', gap: '10px' }}>
-                                    <textarea
-                                        value={newMemo}
-                                        onChange={(e) => setNewMemo(e.target.value)}
-                                        placeholder="対応状況やメモを入力..."
-                                        style={{
-                                            flex: 1,
-                                            height: '40px',
-                                            padding: '8px',
-                                            borderRadius: '4px',
-                                            border: '1px solid #ccc',
-                                            resize: 'none',
-                                            color: '#000',
-                                            background: '#fff'
-                                        }}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                                e.preventDefault();
-                                                sendMemo();
-                                            }
-                                        }}
-                                    />
-                                    <button
-                                        onClick={sendMemo}
-                                        disabled={isLoading || !newMemo.trim()}
-                                        style={{
-                                            width: '60px',
-                                            background: '#3498db',
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer',
-                                            fontWeight: 'bold'
-                                        }}
-                                    >
-                                        送信
-                                    </button>
+
+                                {/* 入力エリア (固定高さ) */}
+                                <div
+                                    style={{
+                                        padding: '10px',
+                                        borderTop: '1px solid #eee',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '5px',
+                                        background: editingMemoId ? '#fffbe6' : 'white',
+                                        flexShrink: 0
+                                    }}
+                                >
+                                    {editingMemoId && (
+                                        <div style={{ fontSize: '11px', color: '#d35400', display: 'flex', justifyContent: 'space-between' }}>
+                                            <span>⚠️ メモを編集中です</span>
+                                            <button
+                                                onClick={handleCancelEdit}
+                                                style={{
+                                                    border: 'none',
+                                                    background: 'transparent',
+                                                    textDecoration: 'underline',
+                                                    cursor: 'pointer',
+                                                    color: '#888'
+                                                }}
+                                            >
+                                                キャンセル
+                                            </button>
+                                        </div>
+                                    )}
+                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                        <textarea
+                                            value={memoInput}
+                                            onChange={(e) => setMemoInput(e.target.value)}
+                                            placeholder="対応状況やメモを入力... (改行可能)"
+                                            style={{
+                                                flex: 1,
+                                                height: '80px', // 入力欄の高さ
+                                                padding: '8px',
+                                                borderRadius: '4px',
+                                                border: editingMemoId ? '2px solid #f1c40f' : '1px solid #ccc',
+                                                resize: 'vertical',
+                                                color: '#000',
+                                                background: '#fff',
+                                                fontFamily: 'inherit'
+                                            }}
+                                        />
+                                        <button
+                                            onClick={handleSubmitMemo}
+                                            disabled={isLoading || !memoInput.trim()}
+                                            style={{
+                                                width: '60px',
+                                                background: editingMemoId ? '#f39c12' : '#3498db',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontWeight: 'bold',
+                                                height: 'auto'
+                                            }}
+                                        >
+                                            {editingMemoId ? '更新' : '送信'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

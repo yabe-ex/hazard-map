@@ -6,8 +6,8 @@ import { Toaster } from 'react-hot-toast';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-    title: 'みんなのハザードマップ',
-    description: '住民が感じる「不安」を可視化する地図サービス'
+    title: 'みんなのマチレポ - 街の気づきを地図にする',
+    description: 'みんなで作る地域の安全・安心マップ。身近な危険箇所や気づきを投稿してシェアしよう。'
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

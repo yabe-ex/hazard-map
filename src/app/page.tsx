@@ -379,7 +379,7 @@ export default function Home() {
                     boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                 }}
             >
-                <h1 style={{ margin: 0, fontSize: '16px', fontWeight: '600', whiteSpace: 'nowrap' }}>みんなのハザードマップ</h1>
+                <h1 style={{ margin: 0, fontSize: '16px', fontWeight: '600', whiteSpace: 'nowrap' }}>みんなのマチレポ</h1>
                 <div>
                     {user && !user.is_anonymous ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
