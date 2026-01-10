@@ -490,7 +490,7 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true }:
 
                     {/* ▲▲▲ キーワード検索・写真フィルタはここから削除しました ▲▲▲ */}
 
-                    {allowFiltering && (
+                    {allowFiltering && !fixedCityCode && (
                         <div>
                             <label style={{ display: 'block', fontSize: '12px', color: '#bdc3c7', marginBottom: '5px' }}>表示エリア</label>
                             <select
@@ -964,7 +964,7 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true }:
                                                     {/* @ts-ignore */}
                                                     <input
                                                         type="checkbox"
-                                                        checked={visibleColumns[col]}
+                                                        checked={visibleColumns[col as keyof typeof INITIAL_VISIBLE_COLUMNS]}
                                                         onChange={() => toggleColumn(col as keyof typeof INITIAL_VISIBLE_COLUMNS)}
                                                         style={{ accentColor: '#34495e' }}
                                                     />

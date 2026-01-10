@@ -1,0 +1,14 @@
+{
+  "[project]/src/components/HazardMap.tsx [app-client] (ecmascript, next/dynamic entry)": {
+    "id": "[project]/src/components/HazardMap.tsx [app-client] (ecmascript, next/dynamic entry)",
+    "files": [
+      "static/chunks/src_components_HeatmapLayer_tsx_6d54c046._.js",
+      "static/chunks/node_modules_408c7679._.js",
+      "static/chunks/src_components_c26a84b3._.js",
+      "static/chunks/node_modules_2d9b6395._.css",
+      "static/chunks/src_components_HazardMap_tsx_039cc0a0._.js",
+      "static/chunks/_80e46fba._.js",
+      "static/chunks/src_components_HeatmapLayer_tsx_f9ed3d50._.js"
+    ]
+  }
+}

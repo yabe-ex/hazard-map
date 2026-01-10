@@ -1,0 +1,8 @@
+{
+  "/[citySlug]/page": "app/[citySlug]/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/dashboard/[cityCode]/page": "app/dashboard/[cityCode]/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/page": "app/page.js"
+}

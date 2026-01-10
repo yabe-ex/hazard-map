@@ -1,20 +1,37 @@
-import AdminDashboard from '@/components/AdminDashboard';
 import { CITIES } from '@/constants/cities';
+import AdminDashboard from '@/components/AdminDashboard';
 
-// ▼▼▼ 追加: 静的エクスポート用に生成するパスを定義する関数 ▼▼▼
+// 静的パスの生成
 export async function generateStaticParams() {
-    // CITIESに定義されているすべての自治体IDの配列を返します
-    // 例: [{ cityCode: '11201' }, { cityCode: '11208' }, ...]
-    return Object.values(CITIES).map((city) => ({
-        cityCode: city.id
-    }));
+    const paths: { cityCode: string }[] = [];
+
+    // パターン1: 英語名
+    Object.keys(CITIES).forEach((key) => {
+        paths.push({ cityCode: key });
+    });
+
+    // パターン2: ID
+    Object.values(CITIES).forEach((city) => {
+        paths.push({ cityCode: city.id });
+    });
+
+    return paths;
 }
 
-type Props = {
-    params: Promise<{ cityCode: string }>;
-};
+// キャッシュ無効化
+export const revalidate = 0;
 
-export default async function CityDashboardPage({ params }: Props) {
+export default async function DashboardCityPage({ params }: { params: Promise<{ cityCode: string }> }) {
     const { cityCode } = await params;
-    return <AdminDashboard fixedCityCode={cityCode} allowFiltering={false} />;
+
+    // データ検索
+    const cityData = CITIES[cityCode] || Object.values(CITIES).find((c) => c.id === cityCode);
+
+    if (!cityData) {
+        return <div className="p-10">エリアが見つかりません (Code: {cityCode})</div>;
+    }
+
+    // ▼▼▼ 修正: cityDataオブジェクト全体ではなく、「ID」を fixedCityCode として渡す ▼▼▼
+    // AdminDashboardは fixedCityCode を受け取ると、その都市でフィルタリングする機能を持っています
+    return <AdminDashboard fixedCityCode={cityData.id} />;
 }
