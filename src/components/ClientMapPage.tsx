@@ -63,9 +63,18 @@ async function getAddressFromCoords(lat: number, lng: number) {
     }
 }
 
-function MapControllerLogic({ setCenter, setZoom }: { setCenter: (pos: { lat: number; lng: number }) => void; setZoom: (z: number) => void }) {
+function MapControllerLogic({
+    setCenter,
+    setZoom,
+    enableLocalStorage = true
+}: {
+    setCenter: (pos: { lat: number; lng: number }) => void;
+    setZoom: (z: number) => void;
+    enableLocalStorage?: boolean;
+}) {
     const searchParams = useSearchParams();
 
+    // 1. URLパラメータによる位置指定（最優先）
     useEffect(() => {
         const latParam = searchParams.get('lat');
         const lngParam = searchParams.get('lng');
@@ -83,8 +92,12 @@ function MapControllerLogic({ setCenter, setZoom }: { setCenter: (pos: { lat: nu
         }
     }, [searchParams, setCenter, setZoom]);
 
+    // 2. ローカルストレージからの復元（enableLocalStorageがtrueの場合のみ）
     useEffect(() => {
+        if (!enableLocalStorage) return;
+
         const currentParams = new URLSearchParams(window.location.search);
+        // URLパラメータがある場合はそちらを優先するため、ストレージ読み込みはスキップ
         if (currentParams.has('lat') && currentParams.has('lng')) return;
 
         const savedPos = localStorage.getItem(STORAGE_KEY);
@@ -99,7 +112,7 @@ function MapControllerLogic({ setCenter, setZoom }: { setCenter: (pos: { lat: nu
                 console.error(e);
             }
         }
-    }, [setCenter, setZoom]);
+    }, [setCenter, setZoom, enableLocalStorage]);
     return null;
 }
 
@@ -137,6 +150,19 @@ export default function ClientMapPage({ cityData, recentPosts = [] }: Props) {
 
     const router = useRouter();
 
+    // ▼▼▼ 自治体ページアクセス時に位置をリセットする処理 ▼▼▼
+    useEffect(() => {
+        if (cityData) {
+            // URLパラメータで座標が指定されている場合は、そちらを優先する（共有リンクなど）
+            const params = new URLSearchParams(window.location.search);
+            if (params.has('lat') && params.has('lng')) {
+                return;
+            }
+            setCenter({ lat: cityData.lat, lng: cityData.lng });
+            setZoom(cityData.zoom);
+        }
+    }, [cityData]);
+
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session?.user) setUser(session.user);
@@ -157,7 +183,14 @@ export default function ClientMapPage({ cityData, recentPosts = [] }: Props) {
 
     const fetchPosts = async () => {
         // クライアント側でも最新を取りに行く（投稿直後の反映のため）
-        const { data, error } = await supabase.from('hazard_posts').select('*').order('created_at', { ascending: false });
+        // ▼▼▼ 前回修正分：cityDataがある場合はフィルタリングする ▼▼▼
+        let query = supabase.from('hazard_posts').select('*').order('created_at', { ascending: false });
+
+        if (cityData) {
+            query = query.eq('city_code', cityData.id);
+        }
+
+        const { data, error } = await query;
         if (error) console.error('Error:', error);
         else setPosts(data || []);
     };
@@ -433,7 +466,11 @@ export default function ClientMapPage({ cityData, recentPosts = [] }: Props) {
             `}</style>
 
             <Suspense fallback={null}>
-                <MapControllerLogic setCenter={setCenter} setZoom={setZoom} />
+                <MapControllerLogic
+                    setCenter={setCenter}
+                    setZoom={setZoom}
+                    enableLocalStorage={!cityData} // cityDataがある場合（地域ページ）はlocalStorageを無視して強制的に初期位置へ
+                />
             </Suspense>
 
             <header
