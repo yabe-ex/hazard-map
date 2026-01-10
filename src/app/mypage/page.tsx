@@ -11,13 +11,23 @@ const formatDate = (dateString: string) => {
     return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 };
 
+const ITEMS_PER_PAGE = 100;
+
 export default function MyPage() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<'posts' | 'empathies'>('posts');
     const [myPosts, setMyPosts] = useState<any[]>([]);
     const [empathizedPosts, setEmpathizedPosts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [userId, setUserId] = useState<string | null>(null);
+
+    // ページネーション用ステート
+    const [postsPage, setPostsPage] = useState(1);
+    const [empathiesPage, setEmpathiesPage] = useState(1);
+
+    // 画像ポップアップ用ステート
+    const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
     useEffect(() => {
         // ログインチェック
@@ -43,7 +53,7 @@ export default function MyPage() {
 
         setMyPosts(postsData || []);
 
-        // 2. 共感した投稿を取得（結合テーブルを経由）
+        // 2. 同感した投稿を取得（結合テーブルを経由）
         // hazard_empathies テーブルから、紐づく hazard_posts を取得する
         const { data: empathiesData } = await supabase
             .from('hazard_empathies')
@@ -80,12 +90,54 @@ export default function MyPage() {
 
     // 地図へ移動
     const handleJumpToMap = (lat: number, lng: number) => {
-        // 修正前：router.push(...)
-        // これだと地図の記憶が残ってしまい、移動しないことがある
-
-        // 修正後：window.location.href
         // 強制的にURLを変更して、ページを最初から読み込ませる
         window.location.href = `/?lat=${lat}&lng=${lng}&zoom=18`;
+    };
+
+    // ページネーション計算
+    const getPaginatedData = (data: any[], page: number) => {
+        const start = (page - 1) * ITEMS_PER_PAGE;
+        const end = start + ITEMS_PER_PAGE;
+        return data.slice(start, end);
+    };
+
+    const PaginationControls = ({ totalItems, currentPage, setPage }: { totalItems: number; currentPage: number; setPage: (p: number) => void }) => {
+        const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+        if (totalPages <= 1) return null;
+
+        return (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '20px' }}>
+                <button
+                    onClick={() => setPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    style={{
+                        padding: '8px 16px',
+                        background: currentPage === 1 ? '#eee' : '#fff',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+                    }}
+                >
+                    前へ
+                </button>
+                <span style={{ display: 'flex', alignItems: 'center', fontSize: '14px', color: '#666' }}>
+                    {currentPage} / {totalPages}
+                </span>
+                <button
+                    onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    style={{
+                        padding: '8px 16px',
+                        background: currentPage === totalPages ? '#eee' : '#fff',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
+                    }}
+                >
+                    次へ
+                </button>
+            </div>
+        );
     };
 
     return (
@@ -156,7 +208,7 @@ export default function MyPage() {
                         cursor: 'pointer'
                     }}
                 >
-                    共感した投稿 ({empathizedPosts.length})
+                    同感した投稿 ({empathizedPosts.length})
                 </button>
             </div>
 
@@ -168,161 +220,242 @@ export default function MyPage() {
                     <>
                         {/* --- 自分の投稿リスト --- */}
                         {activeTab === 'posts' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                {myPosts.length === 0 && (
-                                    <p style={{ textAlign: 'center', color: '#999', marginTop: '20px' }}>まだ投稿がありません</p>
-                                )}
+                            <>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                    {myPosts.length === 0 && (
+                                        <p style={{ textAlign: 'center', color: '#999', marginTop: '20px' }}>まだ投稿がありません</p>
+                                    )}
 
-                                {myPosts.map((post) => (
-                                    <div
-                                        key={post.id}
-                                        style={{
-                                            background: '#fff',
-                                            padding: '15px',
-                                            borderRadius: '12px',
-                                            boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
-                                        }}
-                                    >
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                            <span style={{ fontSize: '12px', color: '#999' }}>{formatDate(post.created_at)}</span>
-                                            {/* 共感数バッジ */}
-                                            <span
-                                                style={{
-                                                    fontSize: '12px',
-                                                    fontWeight: 'bold',
-                                                    color: post.empathy_count > 0 ? '#e02424' : '#999',
-                                                    background: post.empathy_count > 0 ? '#ffeaea' : '#f0f0f0',
-                                                    padding: '2px 8px',
-                                                    borderRadius: '10px'
-                                                }}
-                                            >
-                                                🤝 共感 {post.empathy_count}
-                                            </span>
-                                        </div>
-
-                                        <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#333' }}>{post.reason}</h3>
-
-                                        <div style={{ marginBottom: '15px' }}>
-                                            {post.tags?.map((tag: string) => (
+                                    {getPaginatedData(myPosts, postsPage).map((post) => (
+                                        <div
+                                            key={post.id}
+                                            style={{
+                                                background: '#fff',
+                                                padding: '15px',
+                                                borderRadius: '12px',
+                                                boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                                <span style={{ fontSize: '12px', color: '#999' }}>{formatDate(post.created_at)}</span>
+                                                {/* 同感数バッジ */}
                                                 <span
-                                                    key={tag}
                                                     style={{
-                                                        display: 'inline-block',
-                                                        fontSize: '11px',
-                                                        color: '#555',
-                                                        background: '#f5f5f5',
-                                                        padding: '3px 8px',
-                                                        borderRadius: '4px',
-                                                        marginRight: '5px',
-                                                        marginBottom: '5px'
+                                                        fontSize: '12px',
+                                                        fontWeight: 'bold',
+                                                        color: post.empathy_count > 0 ? '#e02424' : '#999',
+                                                        background: post.empathy_count > 0 ? '#ffeaea' : '#f0f0f0',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '10px'
                                                     }}
                                                 >
-                                                    #{tag}
+                                                    🤝 同感 {post.empathy_count}
                                                 </span>
-                                            ))}
-                                        </div>
+                                            </div>
 
-                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                            <div style={{ display: 'flex', gap: '15px' }}>
+                                                <div style={{ flex: 1 }}>
+                                                    <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#333' }}>{post.reason}</h3>
+
+                                                    <div style={{ marginBottom: '15px' }}>
+                                                        {post.tags?.map((tag: string) => (
+                                                            <span
+                                                                key={tag}
+                                                                style={{
+                                                                    display: 'inline-block',
+                                                                    fontSize: '11px',
+                                                                    color: '#555',
+                                                                    background: '#f5f5f5',
+                                                                    padding: '3px 8px',
+                                                                    borderRadius: '4px',
+                                                                    marginRight: '5px',
+                                                                    marginBottom: '5px'
+                                                                }}
+                                                            >
+                                                                #{tag}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* 画像表示（サムネイル） */}
+                                                {post.image_url && (
+                                                    <div style={{ flexShrink: 0 }}>
+                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                        <img
+                                                            src={post.image_url}
+                                                            alt="投稿画像"
+                                                            onClick={() => setSelectedImageUrl(post.image_url)}
+                                                            style={{
+                                                                width: '80px',
+                                                                height: '80px',
+                                                                objectFit: 'cover',
+                                                                borderRadius: '8px',
+                                                                border: '1px solid #eee',
+                                                                cursor: 'pointer'
+                                                            }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                <button
+                                                    onClick={() => handleJumpToMap(post.lat, post.lng)}
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: '8px',
+                                                        background: '#0070f3',
+                                                        color: '#fff',
+                                                        border: 'none',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer',
+                                                        fontSize: '13px'
+                                                    }}
+                                                >
+                                                    📍 地図で見る
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(post.id)}
+                                                    style={{
+                                                        width: '40px',
+                                                        background: '#fff',
+                                                        color: '#d32f2f',
+                                                        border: '1px solid #ffcdd2',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <PaginationControls totalItems={myPosts.length} currentPage={postsPage} setPage={setPostsPage} />
+                            </>
+                        )}
+
+                        {/* --- 同感した投稿リスト --- */}
+                        {activeTab === 'empathies' && (
+                            <>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                    {empathizedPosts.length === 0 && (
+                                        <p style={{ textAlign: 'center', color: '#999', marginTop: '20px' }}>まだ同感がありません</p>
+                                    )}
+
+                                    {getPaginatedData(empathizedPosts, empathiesPage).map((post) => (
+                                        <div
+                                            key={post.id}
+                                            style={{
+                                                background: '#fff',
+                                                padding: '15px',
+                                                borderRadius: '12px',
+                                                boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                                <span style={{ fontSize: '12px', color: '#999' }}>{formatDate(post.created_at)}</span>
+                                                <span style={{ fontSize: '12px', color: '#999' }}>ID: {post.id}</span>
+                                            </div>
+
+                                            <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#333' }}>{post.reason}</h3>
+
+                                            <div style={{ marginBottom: '15px' }}>
+                                                {post.tags?.map((tag: string) => (
+                                                    <span
+                                                        key={tag}
+                                                        style={{
+                                                            display: 'inline-block',
+                                                            fontSize: '11px',
+                                                            color: '#555',
+                                                            background: '#f5f5f5',
+                                                            padding: '3px 8px',
+                                                            borderRadius: '4px',
+                                                            marginRight: '5px',
+                                                            marginBottom: '5px'
+                                                        }}
+                                                    >
+                                                        #{tag}
+                                                    </span>
+                                                ))}
+                                            </div>
+
                                             <button
                                                 onClick={() => handleJumpToMap(post.lat, post.lng)}
                                                 style={{
-                                                    flex: 1,
+                                                    width: '100%',
                                                     padding: '8px',
-                                                    background: '#0070f3',
-                                                    color: '#fff',
-                                                    border: 'none',
+                                                    background: '#fff',
+                                                    color: '#0070f3',
+                                                    border: '1px solid #0070f3',
                                                     borderRadius: '6px',
                                                     cursor: 'pointer',
                                                     fontSize: '13px'
                                                 }}
                                             >
-                                                📍 地図で見る
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(post.id)}
-                                                style={{
-                                                    width: '40px',
-                                                    background: '#fff',
-                                                    color: '#d32f2f',
-                                                    border: '1px solid #ffcdd2',
-                                                    borderRadius: '6px',
-                                                    cursor: 'pointer'
-                                                }}
-                                            >
-                                                🗑️
+                                                📍 地図で確認する
                                             </button>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* --- 共感した投稿リスト --- */}
-                        {activeTab === 'empathies' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                {empathizedPosts.length === 0 && (
-                                    <p style={{ textAlign: 'center', color: '#999', marginTop: '20px' }}>まだ共感がありません</p>
-                                )}
-
-                                {empathizedPosts.map((post) => (
-                                    <div
-                                        key={post.id}
-                                        style={{
-                                            background: '#fff',
-                                            padding: '15px',
-                                            borderRadius: '12px',
-                                            boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
-                                        }}
-                                    >
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                            <span style={{ fontSize: '12px', color: '#999' }}>{formatDate(post.created_at)}</span>
-                                            <span style={{ fontSize: '12px', color: '#999' }}>ID: {post.id}</span>
-                                        </div>
-
-                                        <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#333' }}>{post.reason}</h3>
-
-                                        <div style={{ marginBottom: '15px' }}>
-                                            {post.tags?.map((tag: string) => (
-                                                <span
-                                                    key={tag}
-                                                    style={{
-                                                        display: 'inline-block',
-                                                        fontSize: '11px',
-                                                        color: '#555',
-                                                        background: '#f5f5f5',
-                                                        padding: '3px 8px',
-                                                        borderRadius: '4px',
-                                                        marginRight: '5px',
-                                                        marginBottom: '5px'
-                                                    }}
-                                                >
-                                                    #{tag}
-                                                </span>
-                                            ))}
-                                        </div>
-
-                                        <button
-                                            onClick={() => handleJumpToMap(post.lat, post.lng)}
-                                            style={{
-                                                width: '100%',
-                                                padding: '8px',
-                                                background: '#fff',
-                                                color: '#0070f3',
-                                                border: '1px solid #0070f3',
-                                                borderRadius: '6px',
-                                                cursor: 'pointer',
-                                                fontSize: '13px'
-                                            }}
-                                        >
-                                            📍 地図で確認する
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                                <PaginationControls totalItems={empathizedPosts.length} currentPage={empathiesPage} setPage={setEmpathiesPage} />
+                            </>
                         )}
                     </>
                 )}
             </div>
+
+            {/* 画像拡大モーダル */}
+            {selectedImageUrl && (
+                <div
+                    onClick={() => setSelectedImageUrl(null)}
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(0,0,0,0.8)',
+                        zIndex: 1000,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '20px'
+                    }}
+                >
+                    <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '100%' }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={selectedImageUrl}
+                            alt="拡大画像"
+                            style={{
+                                maxWidth: '100%',
+                                maxHeight: '90vh',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+                            }}
+                            onClick={(e) => e.stopPropagation()} // 画像クリックでは閉じない
+                        />
+                        <button
+                            onClick={() => setSelectedImageUrl(null)}
+                            style={{
+                                position: 'absolute',
+                                top: '-40px',
+                                right: '0',
+                                background: 'none',
+                                border: 'none',
+                                color: '#fff',
+                                fontSize: '30px',
+                                cursor: 'pointer',
+                                padding: '5px'
+                            }}
+                        >
+                            × 閉じる
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

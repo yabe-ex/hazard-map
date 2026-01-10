@@ -183,7 +183,7 @@ export default function ClientMapPage({ cityData, recentPosts = [] }: Props) {
 
     const fetchPosts = async () => {
         // クライアント側でも最新を取りに行く（投稿直後の反映のため）
-        // ▼▼▼ 前回修正分：cityDataがある場合はフィルタリングする ▼▼▼
+        // cityDataがある場合はフィルタリングする
         let query = supabase.from('hazard_posts').select('*').order('created_at', { ascending: false });
 
         if (cityData) {
@@ -462,6 +462,15 @@ export default function ClientMapPage({ cityData, recentPosts = [] }: Props) {
                     .footer-link {
                         font-size: 9px !important;
                     }
+                    /* ▼ アイコンサイズ調整 (新規追加) ▼ */
+                    .map-control-btn {
+                        width: 42px !important;
+                        height: 42px !important;
+                        font-size: 20px !important;
+                    }
+                    .post-btn {
+                        font-size: 24px !important;
+                    }
                 }
             `}</style>
 
@@ -707,6 +716,7 @@ export default function ClientMapPage({ cityData, recentPosts = [] }: Props) {
                 {displayPosts.length > 0 && !isReportListOpen && (
                     <button
                         onClick={() => setIsReportListOpen(true)}
+                        className="map-control-btn"
                         style={{
                             position: 'absolute',
                             bottom: '30px',
@@ -864,6 +874,7 @@ export default function ClientMapPage({ cityData, recentPosts = [] }: Props) {
                     <button
                         onClick={handleCurrentLocation}
                         disabled={isLoadingGPS}
+                        className="map-control-btn"
                         style={{
                             position: 'absolute',
                             bottom: '100px',
@@ -889,6 +900,7 @@ export default function ClientMapPage({ cityData, recentPosts = [] }: Props) {
                 {!isModalOpen && (
                     <button
                         onClick={() => setIsModalOpen(true)}
+                        className="map-control-btn post-btn"
                         style={{
                             position: 'absolute',
                             bottom: '30px',
