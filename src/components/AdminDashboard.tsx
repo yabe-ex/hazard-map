@@ -691,6 +691,27 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true }:
                         })}
                     </div>
                     <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
+                        {/* ▼▼▼ 追加 ▼▼▼ */}
+                        <a
+                            href="/dashboard/team"
+                            style={{
+                                display: 'block',
+                                width: '100%',
+                                padding: '10px',
+                                background: '#27ae60', // 目立つ色
+                                color: 'white',
+                                borderRadius: '4px',
+                                fontSize: '13px',
+                                textAlign: 'center',
+                                textDecoration: 'none',
+                                fontWeight: 'bold',
+                                marginBottom: '10px'
+                            }}
+                        >
+                            👥 チーム・職員管理
+                        </a>
+                        {/* ▲▲▲ 追加 ▲▲▲ */}
+
                         <a
                             href="/"
                             style={{
