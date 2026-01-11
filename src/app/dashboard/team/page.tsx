@@ -125,17 +125,17 @@ export default function TeamManagementPage() {
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
                 <button
                     onClick={() => router.back()}
-                    style={{ marginRight: '15px', border: 'none', background: 'none', fontSize: '20px', cursor: 'pointer' }}
+                    style={{ marginRight: '15px', border: 'none', background: 'none', fontSize: '20px', cursor: 'pointer', color: 'white' }}
                 >
                     ←
                 </button>
-                <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>{isSuperAdmin ? '全体権限管理 (Super Admin)' : 'チーム管理'}</h1>
+                <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0, color: 'white' }}>{isSuperAdmin ? '全体権限管理 (Super Admin)' : 'メンバー管理'}</h1>
             </div>
 
             {/* 追加フォーム */}
             <div style={{ background: isSuperAdmin ? '#fff3cd' : '#f8f9fa', padding: '20px', borderRadius: '8px', marginBottom: '40px' }}>
                 <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px' }}>
-                    {isSuperAdmin ? '👑 自治体代表の任命' : '👤 職員の追加'}
+                    {isSuperAdmin ? '👑 自治体代表の任命' : '👤 メンバーの追加'}
                 </h2>
                 <form onSubmit={handleAddMember} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     {isSuperAdmin && (
@@ -220,6 +220,6 @@ export default function TeamManagementPage() {
                     })}
                 </tbody>
             </table>
-        </div>
+        </div >
     );
 }

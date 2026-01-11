@@ -443,9 +443,9 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true }:
     const displayCityName = fixedCityCode
         ? Object.values(CITIES).find((c) => c.id === fixedCityCode)?.name
         : currentCityKey
-        ? // @ts-ignore
-          CITIES[currentCityKey]?.name
-        : '全域';
+            ? // @ts-ignore
+            CITIES[currentCityKey]?.name
+            : '全域';
 
     const totalPages = Math.ceil(filteredPosts.length / itemsPerPage);
     const paginatedPosts = filteredPosts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -708,7 +708,7 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true }:
                                 marginBottom: '10px'
                             }}
                         >
-                            👥 チーム・職員管理
+                            👥 メンバー管理
                         </a>
                         {/* ▲▲▲ 追加 ▲▲▲ */}
 
@@ -992,18 +992,18 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true }:
                                                     {col === 'id'
                                                         ? 'ID'
                                                         : col === 'reason'
-                                                        ? '不安'
-                                                        : col === 'address'
-                                                        ? '住所'
-                                                        : col === 'userTags'
-                                                        ? 'ユーザータグ'
-                                                        : col === 'empathy'
-                                                        ? '同感'
-                                                        : col === 'date'
-                                                        ? '日時'
-                                                        : col === 'adminTags'
-                                                        ? '管理タグ'
-                                                        : '操作'}
+                                                            ? '不安'
+                                                            : col === 'address'
+                                                                ? '住所'
+                                                                : col === 'userTags'
+                                                                    ? 'ユーザータグ'
+                                                                    : col === 'empathy'
+                                                                        ? '同感'
+                                                                        : col === 'date'
+                                                                            ? '日時'
+                                                                            : col === 'adminTags'
+                                                                                ? '管理タグ'
+                                                                                : '操作'}
                                                 </label>
                                             ))}
                                         </div>
