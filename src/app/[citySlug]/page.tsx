@@ -1,11 +1,12 @@
-import { CITIES } from '@/constants/cities';
+import { getAllCities, getCityBySlug } from '@/lib/cityParams';
 import { supabase } from '@/lib/supabaseClient';
 import ClientMapPage from '@/components/ClientMapPage';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 export async function generateStaticParams() {
-    return Object.values(CITIES).map((city) => ({
+    const cities = await getAllCities();
+    return cities.map((city) => ({
         citySlug: city.slug
     }));
 }
@@ -28,7 +29,7 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { citySlug } = await params;
-    const cityData = Object.values(CITIES).find((c) => c.slug === citySlug);
+    const cityData = await getCityBySlug(citySlug);
 
     if (!cityData) {
         return {
@@ -48,7 +49,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CityPage({ params }: Props) {
     const { citySlug } = await params;
-    const cityData = Object.values(CITIES).find((c) => c.slug === citySlug);
+    const cityData = await getCityBySlug(citySlug);
+    const allCities = await getAllCities();
 
     if (!cityData) {
         notFound();
@@ -56,5 +58,5 @@ export default async function CityPage({ params }: Props) {
 
     const recentPosts = await getCityRecentPosts(cityData.id);
 
-    return <ClientMapPage cityData={cityData} recentPosts={recentPosts} />;
+    return <ClientMapPage cityData={cityData} recentPosts={recentPosts} allCities={allCities} />;
 }

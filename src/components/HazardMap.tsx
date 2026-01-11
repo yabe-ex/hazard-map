@@ -94,9 +94,8 @@ const createCustomIcon = (reason: string, count: number) => {
 
         const badgeHtml =
             count > 0
-                ? `<div style="position: absolute; top: -6px; right: -6px; background-color: #ff4d4f; color: white; border-radius: 10px; min-width: 20px; height: 20px; padding: 0 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 10;">${
-                      count > 99 ? '99+' : count
-                  }</div>`
+                ? `<div style="position: absolute; top: -6px; right: -6px; background-color: #ff4d4f; color: white; border-radius: 10px; min-width: 20px; height: 20px; padding: 0 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 10;">${count > 99 ? '99+' : count
+                }</div>`
                 : '';
 
         return L.divIcon({
@@ -154,11 +153,21 @@ function CityBoundary({ cityId }: { cityId: string }) {
     useEffect(() => {
         if (!cityId) return;
         setGeoData(null);
-        const url = `https://raw.githubusercontent.com/niiyz/JapanCityGeoJson/master/geojson/11/${cityId}.json`;
-        fetch(url)
-            .then((res) => res.json())
+        const prefCode = cityId.substring(0, 2);
+
+        // Fetch from local file only (We have verified full national coverage)
+        const localUrl = `/geojson/${prefCode}/${cityId}.json`;
+
+        fetch(localUrl)
+            .then((res) => {
+                if (!res.ok) throw new Error(`GeoJSON not found for cityId: ${cityId}`);
+                return res.json();
+            })
             .then((data) => setGeoData(data))
-            .catch(console.error);
+            .catch((e) => {
+                console.warn('Failed to load city boundary:', e);
+                setGeoData(null);
+            });
     }, [cityId]);
 
     if (!geoData) return null;

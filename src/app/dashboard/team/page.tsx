@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import toast, { Toaster } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
-import { CITIES } from '@/constants/cities';
+import { getAllCities } from '@/lib/cityParams';
 
 export default function TeamManagementPage() {
     const router = useRouter();
@@ -14,15 +14,21 @@ export default function TeamManagementPage() {
 
     // 入力フォーム用
     const [inputEmail, setInputEmail] = useState('');
-    const [selectedCity, setSelectedCity] = useState(Object.values(CITIES)[0].id); // SuperAdmin用初期値
+    const [cities, setCities] = useState<any[]>([]);
+    const [selectedCity, setSelectedCity] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
+        getAllCities().then((data) => {
+            setCities(data);
+            if (data.length > 0) setSelectedCity(data[0].id);
+        });
         fetchData();
     }, []);
 
     const fetchData = async () => {
         setLoading(true);
+        // ... (省略)
         // 1. 自分の情報を取得
         const {
             data: { user }
@@ -118,6 +124,11 @@ export default function TeamManagementPage() {
 
     const isSuperAdmin = myRole.role === 'super_admin';
 
+    // 都市リストがロードされていない場合はローディング表示（Super Adminのみ）
+    if (isSuperAdmin && cities.length === 0) {
+        return <div style={{ padding: '40px', textAlign: 'center' }}>自治体データを読み込み中...</div>;
+    }
+
     return (
         <div style={{ padding: '40px', maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif', color: '#333' }}>
             <Toaster />
@@ -144,7 +155,7 @@ export default function TeamManagementPage() {
                             onChange={(e) => setSelectedCity(e.target.value)}
                             style={{ padding: '10px', borderRadius: '4px', border: '1px solid #ccc', background: 'white', color: '#333' }}
                         >
-                            {Object.values(CITIES).map((city) => (
+                            {cities.map((city) => (
                                 <option key={city.id} value={city.id}>
                                     {city.name}
                                 </option>
@@ -189,7 +200,7 @@ export default function TeamManagementPage() {
                 </thead>
                 <tbody>
                     {members.map((m) => {
-                        const cityName = Object.values(CITIES).find((c) => c.id === m.city_code)?.name || m.city_code;
+                        const cityName = cities.find((c) => c.id === m.city_code)?.name || m.city_code;
                         return (
                             <tr key={m.user_id} style={{ borderBottom: '1px solid #eee', background: 'white' }}>
                                 <td style={{ padding: '10px', color: '#333', fontSize: '14px' }}>

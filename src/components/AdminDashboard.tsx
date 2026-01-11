@@ -17,11 +17,6 @@ const HazardMap = dynamic(() => import('@/components/HazardMap'), {
 const ADMIN_POS_KEY_PREFIX = 'hazard-map-admin-pos';
 const ADMIN_SETTINGS_KEY = 'hazard-map-admin-settings';
 
-type AdminDashboardProps = {
-    fixedCityCode?: string;
-    allowFiltering?: boolean;
-};
-
 const INITIAL_VISIBLE_COLUMNS = {
     id: true,
     reason: true,
@@ -36,7 +31,16 @@ const INITIAL_VISIBLE_COLUMNS = {
 type SortKey = 'id' | 'reason' | 'address' | 'empathy_count' | 'created_at';
 type SortOrder = 'asc' | 'desc';
 
-export default function AdminDashboard({ fixedCityCode, allowFiltering = true }: AdminDashboardProps) {
+type AdminDashboardProps = {
+    fixedCityCode?: string;
+    allowFiltering?: boolean;
+    allCities?: any[];
+};
+
+export default function AdminDashboard({ fixedCityCode, allowFiltering = true, allCities = [] }: AdminDashboardProps) {
+    // available cities list
+    const cityList = allCities && allCities.length > 0 ? allCities : Object.values(CITIES);
+
     // Data States
     const [allPosts, setAllPosts] = useState<any[]>([]);
     const [filteredPosts, setFilteredPosts] = useState<any[]>([]);
@@ -77,16 +81,30 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true }:
     const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
     const [csvStartDate, setCsvStartDate] = useState('');
     const [csvEndDate, setCsvEndDate] = useState('');
+    const [myRole, setMyRole] = useState<string | null>(null);
+    const [citySearchQuery, setCitySearchQuery] = useState('');
+    const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
+    const [cityHistory, setCityHistory] = useState<string[]>([]); // stored as slugs
 
     const storagePosKey = fixedCityCode ? `${ADMIN_POS_KEY_PREFIX}-${fixedCityCode}` : `${ADMIN_POS_KEY_PREFIX}-global`;
+    const HISTORY_KEY = 'admin_city_history';
+
+    const checkRole = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data } = await supabase.from('admin_roles').select('role').eq('user_id', user.id).single();
+            setMyRole(data?.role || null);
+        }
+    };
 
     // 1. 初期化・設定読み込み
     useEffect(() => {
+        checkRole();
+
         if (fixedCityCode) {
-            const entry = Object.entries(CITIES).find(([_, city]) => city.id === fixedCityCode);
-            if (entry) {
-                const [key, city] = entry;
-                setCurrentCityKey(key);
+            const city = cityList.find(c => c.id === fixedCityCode);
+            if (city) {
+                setCurrentCityKey(city.slug);
                 setCenter({ lat: city.lat, lng: city.lng });
                 setZoom(city.zoom);
             }
@@ -124,6 +142,14 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true }:
         const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         setCsvStartDate(firstDay.toISOString().split('T')[0]);
         setCsvEndDate(lastDay.toISOString().split('T')[0]);
+
+        // Load History
+        try {
+            const h = localStorage.getItem(HISTORY_KEY);
+            if (h) setCityHistory(JSON.parse(h));
+        } catch (e) {
+            console.error(e);
+        }
     }, [fixedCityCode, storagePosKey]);
 
     useEffect(() => {
@@ -190,12 +216,25 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true }:
 
         let temp = allPosts;
 
-        if (fixedCityCode) {
-            temp = temp.filter((p) => p.city_code === fixedCityCode);
-        } else if (currentCityKey) {
-            // @ts-ignore
-            const cityId = CITIES[currentCityKey]?.id;
-            if (cityId) temp = temp.filter((p) => p.city_code === cityId);
+        if (fixedCityCode || currentCityKey) {
+            // 優先度: 選択中の都市 > 固定都市
+            const selectedCity = currentCityKey ? cityList.find((c) => c.slug === currentCityKey) : null;
+            const targetCityId = selectedCity ? selectedCity.id : fixedCityCode;
+
+            if (targetCityId) {
+                // さいたま市(11100)の場合は、区(11101-11110)も全て含める
+                if (targetCityId === '11100') {
+                    temp = temp.filter((p) => p.city_code && p.city_code.startsWith('111'));
+                } else {
+                    // 通常の自治体 or 区 (city_codeが一致するか、住所に自治体名が含まれる場合)
+                    // ※過去データでcity_codeが親都市(11100)になっているが、住所に「北区」などが含まれているケースを救済
+                    const targetCityName = cityList.find((c) => c.id === targetCityId)?.name || '';
+                    temp = temp.filter((p) =>
+                        p.city_code === targetCityId ||
+                        (targetCityName && p.address && p.address.includes(targetCityName))
+                    );
+                }
+            }
         }
 
         if (filterKeyword.trim()) {
@@ -320,12 +359,21 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true }:
             return d >= start && d <= end;
         });
 
-        if (fixedCityCode) {
-            targetPosts = targetPosts.filter((p) => p.city_code === fixedCityCode);
-        } else if (currentCityKey) {
-            // @ts-ignore
-            const cityId = CITIES[currentCityKey]?.id;
-            if (cityId) targetPosts = targetPosts.filter((p) => p.city_code === cityId);
+        if (fixedCityCode || currentCityKey) {
+            const selectedCity = currentCityKey ? cityList.find((c) => c.slug === currentCityKey) : null;
+            const targetCityId = selectedCity ? selectedCity.id : fixedCityCode;
+
+            if (targetCityId) {
+                if (targetCityId === '11100') {
+                    targetPosts = targetPosts.filter((p) => p.city_code && p.city_code.startsWith('111'));
+                } else {
+                    const targetCityName = cityList.find((c) => c.id === targetCityId)?.name || '';
+                    targetPosts = targetPosts.filter((p) =>
+                        p.city_code === targetCityId ||
+                        (targetCityName && p.address && p.address.includes(targetCityName))
+                    );
+                }
+            }
         }
 
         if (targetPosts.length === 0) {
@@ -398,15 +446,45 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true }:
         };
     }, [isDragging]);
 
-    const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const key = e.target.value;
-        setCurrentCityKey(key);
-        // @ts-ignore
-        const city = CITIES[key];
-        const target = city ? { lat: city.lat, lng: city.lng, zoom: city.zoom } : { lat: 35.85, lng: 139.5, zoom: 11 };
+    const selectCity = (slug: string) => {
+        setCurrentCityKey(slug);
+        setCitySearchQuery('');
+        setIsCityDropdownOpen(false);
+
+        // Update history
+        if (slug) {
+            setCityHistory(prev => {
+                const next = [slug, ...prev.filter(s => s !== slug)].slice(0, 10);
+                localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+                return next;
+            });
+        }
+
+        // Trigger map update
+        const city = cityList.find(c => c.slug === slug);
+        let target = city ? { lat: city.lat, lng: city.lng, zoom: city.zoom } : { lat: 35.85, lng: 139.5, zoom: 11 };
+
+        if (!city && fixedCityCode) {
+            const fixedCity = cityList.find(c => c.id === fixedCityCode);
+            if (fixedCity) {
+                target = { lat: fixedCity.lat, lng: fixedCity.lng, zoom: fixedCity.zoom };
+            }
+        }
         setCenter({ lat: target.lat, lng: target.lng });
         setZoom(target.zoom);
         localStorage.setItem(storagePosKey, JSON.stringify(target));
+    };
+
+    // UI Helper to get city name from slug
+    const getCityName = (slug: string) => {
+        const c = cityList.find(city => city.slug === slug);
+        if (!c) return slug;
+        const prefs: Record<string, string> = {
+            '08': '茨城県', '09': '栃木県', '10': '群馬県',
+            '11': '埼玉県', '12': '千葉県', '13': '東京都', '14': '神奈川県'
+        };
+        const pref = prefs[c.prefecture_code || ''] || '';
+        return `${pref} ${c.name}`;
     };
     const handleJumpToPost = (lat: number, lng: number) => {
         setCenter({ lat, lng });
@@ -440,11 +518,12 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true }:
         }
     };
 
+
+
     const displayCityName = fixedCityCode
-        ? Object.values(CITIES).find((c) => c.id === fixedCityCode)?.name
+        ? cityList.find((c) => c.id === fixedCityCode)?.name
         : currentCityKey
-            ? // @ts-ignore
-            CITIES[currentCityKey]?.name
+            ? cityList.find(c => c.slug === currentCityKey)?.name
             : '全域';
 
     const totalPages = Math.ceil(filteredPosts.length / itemsPerPage);
@@ -490,29 +569,127 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true }:
 
                     {/* ▲▲▲ キーワード検索・写真フィルタはここから削除しました ▲▲▲ */}
 
-                    {allowFiltering && !fixedCityCode && (
+                    {allowFiltering && (!fixedCityCode || cityList.length > 1) && (
                         <div>
                             <label style={{ display: 'block', fontSize: '12px', color: '#bdc3c7', marginBottom: '5px' }}>表示エリア</label>
-                            <select
-                                value={currentCityKey}
-                                onChange={handleCityChange}
-                                style={{
-                                    width: '100%',
-                                    padding: '8px',
-                                    borderRadius: '4px',
-                                    border: '1px solid #555',
-                                    background: '#34495e',
-                                    color: 'white',
-                                    fontSize: '13px'
-                                }}
-                            >
-                                <option value="">未選択（全域）</option>
-                                {Object.entries(CITIES).map(([key, city]) => (
-                                    <option key={key} value={key}>
-                                        埼玉県 {city.name}
-                                    </option>
-                                ))}
-                            </select>
+
+                            {/* Search Input */}
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type="text"
+                                    placeholder={currentCityKey ? getCityName(currentCityKey) : "エリアを検索..."}
+                                    value={citySearchQuery}
+                                    onFocus={() => setIsCityDropdownOpen(true)}
+                                    onChange={(e) => {
+                                        setCitySearchQuery(e.target.value);
+                                        setIsCityDropdownOpen(true);
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px',
+                                        borderRadius: '4px',
+                                        border: '1px solid #555',
+                                        background: '#34495e',
+                                        color: 'white',
+                                        fontSize: '13px'
+                                    }}
+                                />
+                                {currentCityKey && (
+                                    <button
+                                        onClick={() => selectCity('')}
+                                        style={{
+                                            position: 'absolute',
+                                            right: '8px',
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: '#ccc',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+
+                                {isCityDropdownOpen && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        left: 0,
+                                        width: '100%',
+                                        maxHeight: '200px',
+                                        overflowY: 'auto',
+                                        background: '#2c3e50',
+                                        border: '1px solid #34495e',
+                                        zIndex: 1000,
+                                        marginTop: '2px',
+                                        borderRadius: '4px',
+                                        boxShadow: '0 4px 8px rgba(0,0,0,0.3)'
+                                    }}>
+                                        {cityList
+                                            .filter(c => {
+                                                const prefs: Record<string, string> = {
+                                                    '08': '茨城県', '09': '栃木県', '10': '群馬県',
+                                                    '11': '埼玉県', '12': '千葉県', '13': '東京都', '14': '神奈川県'
+                                                };
+                                                const pName = prefs[c.prefecture_code || ''] || '';
+                                                return !citySearchQuery ||
+                                                    c.name.includes(citySearchQuery) ||
+                                                    pName.includes(citySearchQuery);
+                                            })
+                                            .map((city) => {
+                                                const prefs: Record<string, string> = {
+                                                    '08': '茨城県', '09': '栃木県', '10': '群馬県',
+                                                    '11': '埼玉県', '12': '千葉県', '13': '東京都', '14': '神奈川県'
+                                                };
+                                                const prefName = prefs[city.prefecture_code || ''] || '';
+                                                return (
+                                                    <div
+                                                        key={city.slug}
+                                                        onClick={() => selectCity(city.slug)}
+                                                        style={{
+                                                            padding: '8px',
+                                                            cursor: 'pointer',
+                                                            borderBottom: '1px solid #34495e',
+                                                            fontSize: '13px',
+                                                            background: currentCityKey === city.slug ? '#3e5871' : 'transparent'
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.background = '#34495e'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.background = currentCityKey === city.slug ? '#3e5871' : 'transparent'}
+                                                    >
+                                                        {prefName} {city.name}
+                                                    </div>
+                                                );
+                                            })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* History */}
+                            {cityHistory.length > 0 && (
+                                <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                    {cityHistory.map(slug => (
+                                        <button
+                                            key={slug}
+                                            onClick={() => selectCity(slug)}
+                                            style={{
+                                                fontSize: '11px',
+                                                padding: '2px 6px',
+                                                background: currentCityKey === slug ? '#2980b9' : '#444',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '10px',
+                                                cursor: 'pointer',
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                            title={getCityName(slug)}
+                                        >
+                                            {getCityName(slug)}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                     <hr style={{ border: 'none', borderTop: '1px solid #34495e', margin: '0' }} />
@@ -710,6 +887,28 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true }:
                         >
                             👥 メンバー管理
                         </a>
+
+                        {/* 自治体マスタ管理 (Super Adminのみ) */}
+                        {myRole === 'super_admin' && (
+                            <a
+                                href="/dashboard/admin/cities"
+                                style={{
+                                    display: 'block',
+                                    width: '100%',
+                                    padding: '10px',
+                                    background: '#8e44ad', // 紫色
+                                    color: 'white',
+                                    borderRadius: '4px',
+                                    fontSize: '13px',
+                                    textAlign: 'center',
+                                    textDecoration: 'none',
+                                    fontWeight: 'bold',
+                                    marginBottom: '10px'
+                                }}
+                            >
+                                🏢 自治体管理
+                            </a>
+                        )}
                         {/* ▲▲▲ 追加 ▲▲▲ */}
 
                         <a
@@ -743,7 +942,7 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true }:
                         onMapChange={handleMapChange}
                         mapMode={mapMode}
                         // @ts-ignore
-                        selectedCityId={fixedCityCode || (currentCityKey ? CITIES[currentCityKey]?.id : null)}
+                        selectedCityId={fixedCityCode || (currentCityKey ? cityList.find(c => c.slug === currentCityKey)?.id : null)}
                         isAdmin={true}
                         onPostUpdate={handlePostUpdate}
                         showHeatmap={isHeatmapMode}

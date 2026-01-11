@@ -10,6 +10,9 @@ export type CityData = {
     lat: number; // 中心緯度
     lng: number; // 中心経度
     zoom: number; // 地図ズームレベル
+    prefecture_code?: string; // 都道府県コード (11:埼玉, 13:東京)
+    parent_city_id?: string | null; // 親自治体ID (政令指定都市の区の場合に使用)
+    is_designated?: boolean; // 政令指定都市かどうか
 };
 
 export const CITIES: Record<string, CityData> = {

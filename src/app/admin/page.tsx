@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import toast, { Toaster } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import { REASONS, ReasonType } from '@/constants/reasons';
-import { CITIES } from '@/constants/cities';
+import { getAllCities } from '@/lib/cityParams';
 
 const HazardMap = dynamic(() => import('@/components/HazardMap'), {
     loading: () => <div className="p-10 text-center text-gray-500">地図を読み込み中...</div>,
@@ -21,13 +21,21 @@ export default function AdminPage() {
     const [allPosts, setAllPosts] = useState<any[]>([]);
     const [filteredPosts, setFilteredPosts] = useState<any[]>([]);
     const [selectedReasons, setSelectedReasons] = useState<ReasonType[]>([]);
-    const [currentCityKey, setCurrentCityKey] = useState<string>('');
+    const [currentCityId, setCurrentCityId] = useState<string>('');
     const [center, setCenter] = useState({ lat: 35.85, lng: 139.5 });
     const [zoom, setZoom] = useState(11);
     const [mapMode, setMapMode] = useState<'standard' | 'simple' | 'satellite'>('standard');
+    const [cities, setCities] = useState<any[]>([]); // New state
 
     useEffect(() => {
+        const loadCities = async () => {
+            const data = await getAllCities();
+            setCities(data);
+        };
+        loadCities();
+
         const fetchPosts = async () => {
+            // ... (existing fetchPosts)
             const { data, error } = await supabase.from('hazard_posts').select('*').order('created_at', { ascending: false });
             if (error) {
                 toast.error('データの取得に失敗しました');
@@ -61,31 +69,28 @@ export default function AdminPage() {
         if (selectedReasons.length > 0) tempPosts = tempPosts.filter((post) => selectedReasons.includes(post.reason));
         else tempPosts = [];
 
-        if (currentCityKey) {
-            // @ts-ignore
-            const cityId = CITIES[currentCityKey]?.id;
-            if (cityId) tempPosts = tempPosts.filter((post) => post.city_code === cityId);
+        if (currentCityId) {
+            tempPosts = tempPosts.filter((post) => post.city_code === currentCityId);
         }
         setFilteredPosts(tempPosts);
-    }, [selectedReasons, currentCityKey, allPosts]);
+    }, [selectedReasons, currentCityId, allPosts]);
 
     const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const cityKey = e.target.value;
-        setCurrentCityKey(cityKey);
-        if (cityKey === '') {
+        const cityId = e.target.value;
+        setCurrentCityId(cityId);
+
+        if (cityId === '') {
             const defaultCenter = { lat: 35.85, lng: 139.5 };
             setCenter(defaultCenter);
             setZoom(11);
-            // 保存
             localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify({ ...defaultCenter, zoom: 11 }));
             return;
         }
-        // @ts-ignore
-        const city = CITIES[cityKey];
+
+        const city = cities.find(c => c.id === cityId);
         if (city) {
             setCenter({ lat: city.lat, lng: city.lng });
             setZoom(city.zoom);
-            // 保存
             localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify({ lat: city.lat, lng: city.lng, zoom: city.zoom }));
         }
     };
@@ -110,8 +115,7 @@ export default function AdminPage() {
 
     return (
         <main style={{ width: '100%', height: '100vh', display: 'flex', fontFamily: '"Helvetica Neue", Arial, sans-serif', overflow: 'hidden' }}>
-            <Toaster position="top-right" />
-
+            {/* ... */}
             <aside
                 style={{
                     width: '280px',
@@ -147,7 +151,7 @@ export default function AdminPage() {
                     <div>
                         <label style={{ display: 'block', fontSize: '13px', color: '#bdc3c7', marginBottom: '8px' }}>表示エリア選択</label>
                         <select
-                            value={currentCityKey}
+                            value={currentCityId}
                             onChange={handleCityChange}
                             style={{
                                 width: '100%',
@@ -160,8 +164,8 @@ export default function AdminPage() {
                             }}
                         >
                             <option value="">未選択（全域）</option>
-                            {Object.entries(CITIES).map(([key, city]) => (
-                                <option key={key} value={key}>
+                            {cities.map((city) => (
+                                <option key={city.id} value={city.id}>
                                     埼玉県 {city.name}
                                 </option>
                             ))}
@@ -246,6 +250,7 @@ export default function AdminPage() {
                                     <input
                                         type="checkbox"
                                         checked={selectedReasons.includes(reason)}
+                                        // @ts-ignore
                                         onChange={() => toggleReason(reason)}
                                         style={{ accentColor: '#3498db', transform: 'scale(1.2)' }}
                                     />
@@ -364,6 +369,6 @@ export default function AdminPage() {
                     </div>
                 </div>
             </div>
-        </main>
+        </main >
     );
 }

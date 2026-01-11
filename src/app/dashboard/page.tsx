@@ -4,12 +4,15 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import AdminDashboard from '@/components/AdminDashboard';
+import { getAllCities } from '@/lib/cityParams';
+import { CityData } from '@/constants/cities'; // 型定義のみ使用
 import toast from 'react-hot-toast';
 
 export default function DashboardPage() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(true);
     const [isAuthorized, setIsAuthorized] = useState(false);
+    const [allCities, setAllCities] = useState<CityData[]>([]);
 
     useEffect(() => {
         const checkPermission = async () => {
@@ -39,7 +42,11 @@ export default function DashboardPage() {
                 return;
             }
 
-            // 3. 許可
+            // 3. 自治体マスタ取得
+            const cities = await getAllCities();
+            setAllCities(cities);
+
+            // 4. 許可
             setIsAuthorized(true);
             setIsLoading(false);
         };
@@ -56,5 +63,5 @@ export default function DashboardPage() {
     }
 
     // フィルタリング（エリア選択）を許可して表示
-    return <AdminDashboard allowFiltering={true} />;
+    return <AdminDashboard allowFiltering={true} allCities={allCities} />;
 }

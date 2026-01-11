@@ -37,7 +37,7 @@ function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
     return R * c;
 }
 
-async function getAddressFromCoords(lat: number, lng: number) {
+async function getAddressFromCoords(lat: number, lng: number, allCities: CityData[]) {
     try {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
         if (!res.ok) throw new Error('Address fetch failed');
@@ -52,8 +52,17 @@ async function getAddressFromCoords(lat: number, lng: number) {
         const fullAddress = `${pref}${city}${suburb}${road}`;
 
         let cityCode = null;
-        if (city && CITY_NAME_TO_CODE[city]) {
-            cityCode = CITY_NAME_TO_CODE[city];
+        // 1. まずcityDataにある名前でマッチング
+        if (city) {
+            // allCitiesから検索 (語尾の「市」などはデータによって微妙に違うかもしれないので、ある程度柔軟に...と言いたいが、
+            // 今はallCities.nameとOpenStreetMapのcity名が一致することを期待する)
+            const found = allCities.find(c => c.name === city || city.includes(c.name));
+            if (found) cityCode = found.id;
+
+            // フォールバック: 定数定義も見ておく（互換性のため）
+            if (!cityCode && CITY_NAME_TO_CODE[city]) {
+                cityCode = CITY_NAME_TO_CODE[city];
+            }
         }
 
         return { fullAddress, cityCode, cityName: city };
@@ -119,9 +128,10 @@ function MapControllerLogic({
 type Props = {
     cityData?: CityData;
     recentPosts?: any[];
+    allCities?: CityData[];
 };
 
-export default function ClientMapPage({ cityData, recentPosts = [] }: Props) {
+export default function ClientMapPage({ cityData, recentPosts = [], allCities = [] }: Props) {
     // 【SEO・表示対策】propsで渡されたデータを初期値にしつつ、stateで管理する
     const [posts, setPosts] = useState<any[]>(recentPosts);
 
@@ -130,6 +140,7 @@ export default function ClientMapPage({ cityData, recentPosts = [] }: Props) {
 
     const [mapMode, setMapMode] = useState<'standard' | 'simple' | 'satellite'>('standard');
     const [isMapMenuOpen, setIsMapMenuOpen] = useState(false);
+    const [isCityMenuOpen, setIsCityMenuOpen] = useState(false);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -317,7 +328,7 @@ export default function ClientMapPage({ cityData, recentPosts = [] }: Props) {
         setIsSubmitting(true);
         const toastId = toast.loading('データを送信中...');
 
-        const { fullAddress, cityCode, cityName } = await getAddressFromCoords(center.lat, center.lng);
+        const { fullAddress, cityCode, cityName } = await getAddressFromCoords(center.lat, center.lng, allCities);
 
         if (cityName) {
             toast.success(`${cityName}の投稿として保存します`, { id: toastId });
@@ -461,6 +472,8 @@ export default function ClientMapPage({ cityData, recentPosts = [] }: Props) {
                     }
                     .footer-link {
                         font-size: 9px !important;
+                        padding-right: 4px !important;
+                        padding-left: 4px !important;
                     }
                     /* ▼ アイコンサイズ調整 (新規追加) ▼ */
                     .map-control-btn {
@@ -495,14 +508,85 @@ export default function ClientMapPage({ cityData, recentPosts = [] }: Props) {
                     boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                 }}
             >
-                <h1 className="header-title" style={{ margin: 0, fontSize: '16px', fontWeight: '600', whiteSpace: 'nowrap' }}>
-                    {cityData ? `${cityData.name}のみんなのマチレポ` : 'みんなのマチレポ'}
-                </h1>
+                <div style={{ position: 'relative' }}>
+                    <h1
+                        className="header-title"
+                        style={{
+                            margin: 0,
+                            fontSize: '16px',
+                            fontWeight: '600',
+                            whiteSpace: 'nowrap',
+                            cursor: allCities.length > 0 ? 'pointer' : 'default',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                        }}
+                        onClick={() => allCities.length > 0 && setIsCityMenuOpen(!isCityMenuOpen)}
+                    >
+                        {cityData ? `${cityData.name}のみんなのマチレポ` : 'みんなのマチレポ'}
+                        {allCities.length > 0 && <span style={{ fontSize: '10px' }}>▼</span>}
+                    </h1>
+
+                    {/* 自治体選択メニュー */}
+                    {isCityMenuOpen && allCities.length > 0 && (
+                        <>
+                            <div
+                                style={{
+                                    position: 'fixed',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    zIndex: 999
+                                }}
+                                onClick={() => setIsCityMenuOpen(false)}
+                            />
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    background: 'white',
+                                    color: '#333',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+                                    zIndex: 1000,
+                                    marginTop: '8px',
+                                    maxHeight: '300px',
+                                    overflowY: 'auto',
+                                    width: '200px'
+                                }}
+                            >
+                                <div style={{ padding: '8px 12px', borderBottom: '1px solid #eee', fontWeight: 'bold', fontSize: '12px', color: '#888' }}>
+                                    地域を選択
+                                </div>
+                                {allCities.map((city) => (
+                                    <Link
+                                        key={city.id}
+                                        href={`/${city.slug}`}
+                                        style={{
+                                            display: 'block',
+                                            padding: '10px 12px',
+                                            textDecoration: 'none',
+                                            color: '#333',
+                                            borderBottom: '1px solid #f0f0f0',
+                                            fontSize: '14px',
+                                            background: cityData?.id === city.id ? '#f0f9ff' : 'white',
+                                            fontWeight: cityData?.id === city.id ? 'bold' : 'normal'
+                                        }}
+                                        onClick={() => setIsCityMenuOpen(false)}
+                                    >
+                                        {city.name}
+                                    </Link>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
                 <div>
                     {user && !user.is_anonymous ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <button
-                                onClick={() => router.push('/mypage')}
                                 style={{
                                     width: '36px',
                                     height: '36px',
