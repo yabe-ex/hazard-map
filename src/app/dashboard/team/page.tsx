@@ -37,18 +37,17 @@ export default function TeamManagementPage() {
 
         setMyRole(roleData);
 
-        // 3. メンバー一覧を取得
-        // (RLSポリシーにより、自動的に「自分の見れる範囲」だけが返ってきます)
-        const { data: membersData, error } = await supabase.from('admin_roles').select('*');
+        // 3. メンバー一覧を取得 (RPCを使用)
+        // city_staffの場合は取得できない（そもそもアクセス制限するが、念のため）
+        if (roleData?.role === 'super_admin' || roleData?.role === 'city_manager') {
+            const { data: membersData, error } = await supabase.rpc('get_admin_members_with_email');
 
-        if (error) {
-            toast.error('データ取得エラー');
-        } else {
-            // メールアドレスはadmin_rolesにないので、別途取得は諦めて「ID」表示にするか、
-            // もしくは「表示用関数」をもう一つ作る手もありますが、
-            // 一旦シンプルに「自分かどうか」だけ判定します。
-            // ※メールアドレスを表示するには別途RPCが必要ですが、まずは機能優先で進めます。
-            setMembers(membersData || []);
+            if (error) {
+                console.error('get_admin_members_with_email error:', error);
+                toast.error('データ取得エラー');
+            } else {
+                setMembers(membersData || []);
+            }
         }
         setLoading(false);
     };
@@ -57,6 +56,15 @@ export default function TeamManagementPage() {
     const handleAddMember = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!inputEmail) return;
+
+        // 重複チェック
+        const normalize = (email: string) => email.trim().toLowerCase();
+        const exists = members.some((m) => normalize(m.email) === normalize(inputEmail));
+        if (exists) {
+            toast.error('そのメールアドレスは既に登録されています');
+            return;
+        }
+
         setIsSubmitting(true);
 
         try {
@@ -103,6 +111,11 @@ export default function TeamManagementPage() {
     if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>読み込み中...</div>;
     if (!myRole) return <div style={{ padding: '40px', textAlign: 'center' }}>権限がありません</div>;
 
+    // city_staffはアクセス不可
+    if (myRole.role === 'city_staff') {
+        return <div style={{ padding: '40px', textAlign: 'center', color: 'red' }}>アクセス権限がありません</div>;
+    }
+
     const isSuperAdmin = myRole.role === 'super_admin';
 
     return (
@@ -129,7 +142,7 @@ export default function TeamManagementPage() {
                         <select
                             value={selectedCity}
                             onChange={(e) => setSelectedCity(e.target.value)}
-                            style={{ padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }}
+                            style={{ padding: '10px', borderRadius: '4px', border: '1px solid #ccc', background: 'white', color: '#333' }}
                         >
                             {Object.values(CITIES).map((city) => (
                                 <option key={city.id} value={city.id}>
@@ -144,7 +157,7 @@ export default function TeamManagementPage() {
                         onChange={(e) => setInputEmail(e.target.value)}
                         placeholder="user@example.com"
                         required
-                        style={{ flex: 1, padding: '10px', borderRadius: '4px', border: '1px solid #ccc', minWidth: '200px' }}
+                        style={{ flex: 1, padding: '10px', borderRadius: '4px', border: '1px solid #ccc', minWidth: '200px', background: 'white', color: '#333' }}
                     />
                     <button
                         type="submit"
@@ -165,34 +178,38 @@ export default function TeamManagementPage() {
             </div>
 
             {/* 一覧表示 */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #ddd' }}>
-                <thead style={{ background: '#eee' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #ddd', background: 'white', fontSize: '14px' }}>
+                <thead style={{ background: '#f4f4f4' }}>
                     <tr>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>User ID / Role</th>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>自治体</th>
-                        <th style={{ padding: '10px', textAlign: 'center' }}>操作</th>
+                        <th style={{ padding: '10px', textAlign: 'left', color: '#333', fontSize: '14px' }}>ユーザー (Email)</th>
+                        <th style={{ padding: '10px', textAlign: 'left', color: '#333', fontSize: '14px' }}>ロール</th>
+                        <th style={{ padding: '10px', textAlign: 'left', color: '#333', fontSize: '14px' }}>自治体</th>
+                        <th style={{ padding: '10px', textAlign: 'center', color: '#333', fontSize: '14px' }}>操作</th>
                     </tr>
                 </thead>
                 <tbody>
                     {members.map((m) => {
                         const cityName = Object.values(CITIES).find((c) => c.id === m.city_code)?.name || m.city_code;
                         return (
-                            <tr key={m.id} style={{ borderBottom: '1px solid #eee' }}>
-                                <td style={{ padding: '10px' }}>
-                                    <div style={{ fontSize: '12px', color: '#666' }}>{m.user_id}</div>
-                                    <div style={{ fontWeight: 'bold' }}>{m.role}</div>
+                            <tr key={m.user_id} style={{ borderBottom: '1px solid #eee', background: 'white' }}>
+                                <td style={{ padding: '10px', color: '#333', fontSize: '14px' }}>
+                                    <div style={{ fontWeight: 'bold' }}>{m.email}</div>
                                 </td>
-                                <td style={{ padding: '10px' }}>{cityName}</td>
-                                <td style={{ padding: '10px', textAlign: 'center' }}>
+                                <td style={{ padding: '10px', color: '#333', fontSize: '14px' }}>
+                                    <div style={{ fontSize: '14px' }}>{m.role}</div>
+                                </td>
+                                <td style={{ padding: '10px', color: '#333', fontSize: '14px' }}>{cityName}</td>
+                                <td style={{ padding: '10px', textAlign: 'center', fontSize: '14px' }}>
                                     <button
                                         onClick={() => handleRemove(m.user_id)}
                                         style={{
                                             color: 'red',
-                                            background: 'none',
+                                            background: 'white',
                                             border: '1px solid red',
                                             borderRadius: '4px',
                                             padding: '4px 8px',
-                                            cursor: 'pointer'
+                                            cursor: 'pointer',
+                                            fontSize: '12px'
                                         }}
                                     >
                                         解除
