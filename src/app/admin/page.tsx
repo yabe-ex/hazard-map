@@ -289,7 +289,7 @@ export default function AdminPage() {
                         onMapChange={handleMapChange}
                         mapMode={mapMode}
                         // @ts-ignore
-                        selectedCityId={currentCityKey ? CITIES[currentCityKey].id : null}
+                        selectedCityId={currentCityId || null}
                     />
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto', background: '#f0f2f5', padding: '20px' }}>

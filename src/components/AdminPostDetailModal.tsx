@@ -164,6 +164,28 @@ export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, 
         setMemoInput('');
     };
 
+    const handleDeleteTag = async (tagId: number) => {
+        if (!window.confirm('このタグを完全に削除しますか？\n使用されているすべての投稿からこのタグが外れます。')) return;
+
+        // 1. Remove from all posts (post_tags)
+        const { error: linkError } = await supabase.from('post_tags').delete().eq('tag_id', tagId);
+        if (linkError) {
+            toast.error('タグの関連付け解除に失敗しました');
+            return;
+        }
+
+        // 2. Remove tag definition (admin_tags)
+        const { error: tagError } = await supabase.from('admin_tags').delete().eq('id', tagId);
+        if (tagError) {
+            toast.error('タグの削除に失敗しました');
+        } else {
+            toast.success('タグを削除しました');
+            fetchTags();
+            setAttachedTagIds((prev) => prev.filter((id) => id !== tagId));
+            onUpdate(); // Reflect changes in parent
+        }
+    };
+
     const createCustomTag = async () => {
         if (!newTagName.trim()) return;
         const { error } = await supabase
@@ -257,6 +279,23 @@ export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, 
                                     style={{ width: '100%', borderRadius: '6px', border: '1px solid #ddd', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}
                                     alt="投稿写真"
                                 />
+                                {post.photo_taken_at !== null && post.photo_taken_at !== undefined && (
+                                    <div
+                                        style={{
+                                            marginTop: '8px',
+                                            fontSize: '12px',
+                                            fontWeight: 'bold',
+                                            color: post.photo_taken_at <= 300 ? '#27ae60' : '#c0392b',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}
+                                    >
+                                        <span style={{ fontSize: '14px' }}>{post.photo_taken_at <= 300 ? '✅' : '⚠️'}</span>
+                                        撮影地点との距離: 約{Math.round(post.photo_taken_at)}m
+                                        {post.photo_taken_at > 300 && ' (遠)'}
+                                    </div>
+                                )}
                             </div>
                         )}
                         <div style={{ marginBottom: '15px' }}>
@@ -319,23 +358,44 @@ export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, 
                                     {allTags.map((tag) => {
                                         const isActive = attachedTagIds.includes(tag.id);
                                         return (
-                                            <button
-                                                key={tag.id}
-                                                onClick={() => toggleTag(tag)}
-                                                style={{
-                                                    padding: '6px 12px',
-                                                    borderRadius: '20px',
-                                                    border: `1px solid ${tag.color}`,
-                                                    background: isActive ? tag.color : 'white',
-                                                    color: isActive ? 'white' : tag.color,
-                                                    cursor: 'pointer',
-                                                    fontSize: '13px',
-                                                    fontWeight: 'bold'
-                                                }}
-                                            >
-                                                {isActive && '✔ '}
-                                                {tag.label}
-                                            </button>
+                                            <div key={tag.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                                <button
+                                                    onClick={() => toggleTag(tag)}
+                                                    style={{
+                                                        padding: '6px 12px',
+                                                        borderRadius: '20px',
+                                                        border: `1px solid ${tag.color}`,
+                                                        background: isActive ? tag.color : 'white',
+                                                        color: isActive ? 'white' : tag.color,
+                                                        cursor: 'pointer',
+                                                        fontSize: '13px',
+                                                        fontWeight: 'bold'
+                                                    }}
+                                                >
+                                                    {isActive && '✔ '}
+                                                    {tag.label}
+                                                </button>
+                                                {!tag.is_system && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteTag(tag.id);
+                                                        }}
+                                                        style={{
+                                                            background: 'transparent',
+                                                            border: 'none',
+                                                            color: '#999',
+                                                            cursor: 'pointer',
+                                                            fontSize: '14px',
+                                                            padding: '0 4px',
+                                                            lineHeight: 1
+                                                        }}
+                                                        title="タグを削除"
+                                                    >
+                                                        ×
+                                                    </button>
+                                                )}
+                                            </div>
                                         );
                                     })}
                                 </div>

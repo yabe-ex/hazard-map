@@ -33,11 +33,12 @@ type SortOrder = 'asc' | 'desc';
 
 type AdminDashboardProps = {
     fixedCityCode?: string;
+    targetUserId?: string; // New prop for filtering by user
     allowFiltering?: boolean;
     allCities?: any[];
 };
 
-export default function AdminDashboard({ fixedCityCode, allowFiltering = true, allCities = [] }: AdminDashboardProps) {
+export default function AdminDashboard({ fixedCityCode, targetUserId, allowFiltering = true, allCities = [] }: AdminDashboardProps) {
     // available cities list
     const cityList = allCities && allCities.length > 0 ? allCities : Object.values(CITIES);
 
@@ -49,6 +50,7 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
     // Filter States
     const [filterKeyword, setFilterKeyword] = useState('');
     const [filterHasPhoto, setFilterHasPhoto] = useState(false);
+    const [filterIsQualified, setFilterIsQualified] = useState(false);
     const [selectedReasons, setSelectedReasons] = useState<ReasonType[]>([]);
     const [selectedAdminTagIds, setSelectedAdminTagIds] = useState<number[]>([]);
     const [selectedUserTags, setSelectedUserTags] = useState<string[]>([]);
@@ -160,7 +162,13 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
     // 2. データ取得
     const fetchPosts = useCallback(async () => {
         try {
-            const { data: postsData, error: postsError } = await supabase.from('hazard_posts').select('*').order('created_at', { ascending: false });
+            let query = supabase.from('hazard_posts').select('*').order('created_at', { ascending: false });
+
+            if (targetUserId) {
+                query = query.eq('user_id', targetUserId);
+            }
+
+            const { data: postsData, error: postsError } = await query;
 
             if (postsError) {
                 toast.error('データの取得に失敗しました');
@@ -204,7 +212,7 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
             console.error(e);
             toast.error('予期せぬエラーが発生しました');
         }
-    }, []);
+    }, [targetUserId]);
 
     useEffect(() => {
         fetchPosts();
@@ -216,18 +224,17 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
 
         let temp = allPosts;
 
-        if (fixedCityCode || currentCityKey) {
+        if (targetUserId) {
+            // No city filtering
+        } else if (fixedCityCode || currentCityKey) {
             // 優先度: 選択中の都市 > 固定都市
             const selectedCity = currentCityKey ? cityList.find((c) => c.slug === currentCityKey) : null;
             const targetCityId = selectedCity ? selectedCity.id : fixedCityCode;
 
             if (targetCityId) {
-                // さいたま市(11100)の場合は、区(11101-11110)も全て含める
                 if (targetCityId === '11100') {
                     temp = temp.filter((p) => p.city_code && p.city_code.startsWith('111'));
                 } else {
-                    // 通常の自治体 or 区 (city_codeが一致するか、住所に自治体名が含まれる場合)
-                    // ※過去データでcity_codeが親都市(11100)になっているが、住所に「北区」などが含まれているケースを救済
                     const targetCityName = cityList.find((c) => c.id === targetCityId)?.name || '';
                     temp = temp.filter((p) =>
                         p.city_code === targetCityId ||
@@ -248,6 +255,7 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
         }
 
         if (filterHasPhoto) temp = temp.filter((p) => p.image_url);
+        if (filterIsQualified) temp = temp.filter((p) => p.image_url && p.photo_taken_at !== null && p.photo_taken_at <= 300);
 
         if (selectedReasons.length > 0) temp = temp.filter((p) => selectedReasons.includes(p.reason));
         else temp = [];
@@ -295,6 +303,7 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
         currentCityKey,
         filterKeyword,
         filterHasPhoto,
+        filterIsQualified,
         selectedReasons,
         selectedAdminTagIds,
         selectedUserTags,
@@ -520,11 +529,13 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
 
 
 
-    const displayCityName = fixedCityCode
-        ? cityList.find((c) => c.id === fixedCityCode)?.name
-        : currentCityKey
-            ? cityList.find(c => c.slug === currentCityKey)?.name
-            : '全域';
+    const displayCityName = targetUserId
+        ? '特定ユーザー'
+        : fixedCityCode
+            ? cityList.find((c) => c.id === fixedCityCode)?.name
+            : currentCityKey
+                ? cityList.find(c => c.slug === currentCityKey)?.name
+                : '全域';
 
     const totalPages = Math.ceil(filteredPosts.length / itemsPerPage);
     const paginatedPosts = filteredPosts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -543,14 +554,36 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
                 }}
             >
                 {/* サイドバー */}
-                <div style={{ padding: '15px 20px', borderBottom: '1px solid #34495e' }}>
+                <div style={{ padding: '15px 20px', borderBottom: '1px solid #34495e', flexShrink: 0 }}>
                     <h1 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>
                         {fixedCityCode ? `${displayCityName} 管理画面` : '総合管理画面'}
                     </h1>
+                    {fixedCityCode && (() => {
+                        const targetCity = cityList.find((c) => c.id === fixedCityCode);
+                        if (targetCity?.slug) {
+                            return (
+                                <a
+                                    href={`/${targetCity.slug}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        display: 'block',
+                                        marginTop: '8px',
+                                        fontSize: '12px',
+                                        color: '#3498db',
+                                        textDecoration: 'none',
+                                        fontWeight: 'normal'
+                                    }}
+                                >
+                                    🌐 公開ページを確認
+                                </a>
+                            );
+                        }
+                    })()}
                 </div>
 
-                <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto' }}>
-                    {/* 件数表示 */}
+                {/* Fixed Count Display */}
+                <div style={{ padding: '15px 20px 0', flexShrink: 0 }}>
                     <div
                         style={{
                             background: 'white',
@@ -566,8 +599,10 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
                             <span style={{ fontSize: '12px', marginLeft: '2px', fontWeight: 'normal' }}>件</span>
                         </div>
                     </div>
+                </div>
 
-                    {/* ▲▲▲ キーワード検索・写真フィルタはここから削除しました ▲▲▲ */}
+                {/* Scrollable Filters Area */}
+                <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
 
                     {allowFiltering && (!fixedCityCode || cityList.length > 1) && (
                         <div>
@@ -688,6 +723,30 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
                                             {getCityName(slug)}
                                         </button>
                                     ))}
+                                </div>
+                            )}
+
+                            {/* Public Page Link for Super Admin */}
+                            {currentCityKey && (
+                                <div style={{ marginTop: '12px' }}>
+                                    <a
+                                        href={`/${currentCityKey}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{
+                                            display: 'block',
+                                            padding: '8px',
+                                            background: '#2980b9',
+                                            color: 'white',
+                                            textAlign: 'center',
+                                            borderRadius: '4px',
+                                            textDecoration: 'none',
+                                            fontSize: '12px',
+                                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                                        }}
+                                    >
+                                        🌐 公開ページを開く
+                                    </a>
                                 </div>
                             )}
                         </div>
@@ -867,15 +926,38 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
                             );
                         })}
                     </div>
-                    <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
-                        {/* ▼▼▼ 追加 ▼▼▼ */}
+                </div>
+
+                {/* Fixed Footer Links */}
+                <div style={{ padding: '15px 20px', borderTop: '1px solid #34495e', background: '#2c3e50', flexShrink: 0 }}>
+                    <a
+                        href="/dashboard/team"
+                        style={{
+                            display: 'block',
+                            width: '100%',
+                            padding: '10px',
+                            background: '#27ae60', // 目立つ色
+                            color: 'white',
+                            borderRadius: '4px',
+                            fontSize: '13px',
+                            textAlign: 'center',
+                            textDecoration: 'none',
+                            fontWeight: 'bold',
+                            marginBottom: '10px'
+                        }}
+                    >
+                        👥 メンバー管理
+                    </a>
+
+                    {/* 自治体マスタ管理 (Super Adminのみ) */}
+                    {myRole === 'super_admin' && (
                         <a
-                            href="/dashboard/team"
+                            href="/dashboard/admin/cities"
                             style={{
                                 display: 'block',
                                 width: '100%',
                                 padding: '10px',
-                                background: '#27ae60', // 目立つ色
+                                background: '#8e44ad', // 紫色
                                 color: 'white',
                                 borderRadius: '4px',
                                 fontSize: '13px',
@@ -885,50 +967,49 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
                                 marginBottom: '10px'
                             }}
                         >
-                            👥 メンバー管理
+                            🏢 自治体管理
                         </a>
+                    )}
 
-                        {/* 自治体マスタ管理 (Super Adminのみ) */}
-                        {myRole === 'super_admin' && (
-                            <a
-                                href="/dashboard/admin/cities"
-                                style={{
-                                    display: 'block',
-                                    width: '100%',
-                                    padding: '10px',
-                                    background: '#8e44ad', // 紫色
-                                    color: 'white',
-                                    borderRadius: '4px',
-                                    fontSize: '13px',
-                                    textAlign: 'center',
-                                    textDecoration: 'none',
-                                    fontWeight: 'bold',
-                                    marginBottom: '10px'
-                                }}
-                            >
-                                🏢 自治体管理
-                            </a>
-                        )}
-                        {/* ▲▲▲ 追加 ▲▲▲ */}
-
+                    {/* Super Admin Menu Link */}
+                    {myRole === 'super_admin' && !targetUserId && (
                         <a
-                            href="/"
+                            href="/dashboard/admin/users"
                             style={{
                                 display: 'block',
-                                width: '100%',
                                 padding: '10px',
-                                background: 'transparent',
+                                background: '#2c3e50',
                                 border: '1px solid #7f8c8d',
                                 color: '#ecf0f1',
                                 borderRadius: '4px',
                                 fontSize: '13px',
                                 textAlign: 'center',
-                                textDecoration: 'none'
+                                textDecoration: 'none',
+                                marginTop: '10px',
+                                marginBottom: '10px'
                             }}
                         >
-                            ← 一般ページへ戻る
+                            👥 ユーザー管理
                         </a>
-                    </div>
+                    )}
+
+                    <a
+                        href="/"
+                        style={{
+                            display: 'block',
+                            width: '100%',
+                            padding: '10px',
+                            background: 'transparent',
+                            border: '1px solid #7f8c8d',
+                            color: '#ecf0f1',
+                            borderRadius: '4px',
+                            fontSize: '13px',
+                            textAlign: 'center',
+                            textDecoration: 'none'
+                        }}
+                    >
+                        ← 一般ページへ戻る
+                    </a>
                 </div>
             </aside>
 
@@ -1105,6 +1186,27 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
                                             style={{ accentColor: '#3498db', width: '16px', height: '16px' }}
                                         />
                                         写真あり
+                                    </label>
+
+                                    {/* 2.5 距離フィルタ */}
+                                    <label
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            cursor: 'pointer',
+                                            color: '#333',
+                                            fontSize: '13px',
+                                            fontWeight: 'bold'
+                                        }}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={filterIsQualified}
+                                            onChange={(e) => setFilterIsQualified(e.target.checked)}
+                                            style={{ accentColor: '#27ae60', width: '16px', height: '16px' }}
+                                        />
+                                        距離近い (300m以内)
                                     </label>
                                 </div>
 
@@ -1365,8 +1467,13 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
                                                             disabled={!post.image_url}
                                                             style={{
                                                                 padding: '6px 10px',
-                                                                background: post.image_url ? '#e67e22' : '#f0f2f5',
-                                                                border: post.image_url ? '1px solid #d35400' : '1px solid #dce0e5',
+                                                                background: (() => {
+                                                                    if (!post.image_url) return '#f0f2f5';
+                                                                    if (post.photo_taken_at === null || post.photo_taken_at === undefined) return '#3498db'; // Unknown (Blue)
+                                                                    if (post.photo_taken_at <= 300) return '#27ae60'; // Close (Green)
+                                                                    return '#c0392b'; // Far (Red)
+                                                                })(),
+                                                                border: '1px solid transparent', // Simple border
                                                                 color: post.image_url ? '#ffffff' : '#555',
                                                                 borderRadius: '4px',
                                                                 cursor: post.image_url ? 'pointer' : 'not-allowed',
@@ -1375,7 +1482,11 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
                                                                 alignItems: 'center',
                                                                 justifyContent: 'center'
                                                             }}
-                                                            title="写真を見る"
+                                                            title={
+                                                                post.photo_taken_at
+                                                                    ? `写真あり (距離: ${Math.round(post.photo_taken_at)}m)`
+                                                                    : '写真を見る'
+                                                            }
                                                         >
                                                             <svg
                                                                 width="16"
@@ -1469,7 +1580,7 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
                         )}
                     </div>
                 </div>
-            </div>
+            </div >
 
             <AdminPostDetailModal
                 post={selectedPost}
@@ -1478,130 +1589,134 @@ export default function AdminDashboard({ fixedCityCode, allowFiltering = true, a
                 onUpdate={handleModalUpdate}
                 cityCodeFilter={fixedCityCode || null}
             />
-            {isCsvModalOpen && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        background: 'rgba(0,0,0,0.5)',
-                        zIndex: 99999,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                    }}
-                    onClick={() => setIsCsvModalOpen(false)}
-                >
+            {
+                isCsvModalOpen && (
                     <div
                         style={{
-                            background: 'white',
-                            padding: '20px',
-                            borderRadius: '8px',
-                            width: '350px',
-                            maxWidth: '90%',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            background: 'rgba(0,0,0,0.5)',
+                            zIndex: 99999,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
                         }}
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={() => setIsCsvModalOpen(false)}
                     >
-                        <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', fontWeight: 'bold', color: '#2c3e50', textAlign: 'center' }}>
-                            CSV出力期間の設定
-                        </h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                            <div>
-                                <label style={{ display: 'block', fontSize: '12px', color: '#7f8c8d', marginBottom: '5px' }}>開始日</label>
-                                <input
-                                    type="date"
-                                    value={csvStartDate}
-                                    onChange={(e) => setCsvStartDate(e.target.value)}
-                                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', fontSize: '12px', color: '#7f8c8d', marginBottom: '5px' }}>終了日</label>
-                                <input
-                                    type="date"
-                                    value={csvEndDate}
-                                    onChange={(e) => setCsvEndDate(e.target.value)}
-                                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                                />
-                            </div>
-                            <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                <button
-                                    onClick={() => setIsCsvModalOpen(false)}
-                                    style={{
-                                        flex: 1,
-                                        padding: '10px',
-                                        background: '#ccc',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        fontWeight: 'bold'
-                                    }}
-                                >
-                                    キャンセル
-                                </button>
-                                <button
-                                    onClick={handleDownloadCsv}
-                                    style={{
-                                        flex: 1,
-                                        padding: '10px',
-                                        background: '#27ae60',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        fontWeight: 'bold'
-                                    }}
-                                >
-                                    ダウンロード
-                                </button>
+                        <div
+                            style={{
+                                background: 'white',
+                                padding: '20px',
+                                borderRadius: '8px',
+                                width: '350px',
+                                maxWidth: '90%',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', fontWeight: 'bold', color: '#2c3e50', textAlign: 'center' }}>
+                                CSV出力期間の設定
+                            </h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '12px', color: '#7f8c8d', marginBottom: '5px' }}>開始日</label>
+                                    <input
+                                        type="date"
+                                        value={csvStartDate}
+                                        onChange={(e) => setCsvStartDate(e.target.value)}
+                                        style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '12px', color: '#7f8c8d', marginBottom: '5px' }}>終了日</label>
+                                    <input
+                                        type="date"
+                                        value={csvEndDate}
+                                        onChange={(e) => setCsvEndDate(e.target.value)}
+                                        style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                                    <button
+                                        onClick={() => setIsCsvModalOpen(false)}
+                                        style={{
+                                            flex: 1,
+                                            padding: '10px',
+                                            background: '#ccc',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontWeight: 'bold'
+                                        }}
+                                    >
+                                        キャンセル
+                                    </button>
+                                    <button
+                                        onClick={handleDownloadCsv}
+                                        style={{
+                                            flex: 1,
+                                            padding: '10px',
+                                            background: '#27ae60',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontWeight: 'bold'
+                                        }}
+                                    >
+                                        ダウンロード
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-            {previewImageUrl && (
-                <div
-                    onClick={closePreview}
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        background: 'rgba(0, 0, 0, 0.85)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 99999,
-                        cursor: 'pointer',
-                        padding: '20px'
-                    }}
-                >
-                    <img
-                        src={previewImageUrl}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ maxWidth: '90%', maxHeight: '90%', borderRadius: '4px', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}
-                    />
-                    <button
+                )
+            }
+            {
+                previewImageUrl && (
+                    <div
                         onClick={closePreview}
                         style={{
-                            position: 'absolute',
-                            top: '20px',
-                            right: '20px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'white',
-                            fontSize: '30px',
-                            cursor: 'pointer'
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            background: 'rgba(0, 0, 0, 0.85)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 99999,
+                            cursor: 'pointer',
+                            padding: '20px'
                         }}
                     >
-                        ×
-                    </button>
-                </div>
-            )}
-        </div>
+                        <img
+                            src={previewImageUrl}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ maxWidth: '90%', maxHeight: '90%', borderRadius: '4px', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}
+                        />
+                        <button
+                            onClick={closePreview}
+                            style={{
+                                position: 'absolute',
+                                top: '20px',
+                                right: '20px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'white',
+                                fontSize: '30px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            ×
+                        </button>
+                    </div>
+                )
+            }
+        </div >
     );
 }

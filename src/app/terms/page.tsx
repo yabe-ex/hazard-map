@@ -99,12 +99,24 @@ export default function TermsPage() {
                 </section>
 
                 <section style={{ marginBottom: '30px' }}>
-                    <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '15px', color: '#444' }}>第8条（利用規約の変更）</h2>
+                    <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '15px', color: '#444' }}>第8条（ポイント・称号等の取り扱い）</h2>
+                    <p>
+                        本サービス内で獲得できる「スコア」「称号」等のゲーミフィケーション要素（以下「デジタル特典」といいます。）について、以下の通り定めます。
+                    </p>
+                    <ul style={{ listStyle: 'disc', paddingLeft: '20px', marginTop: '10px' }}>
+                        <li>デジタル特典は、本サービス内でのみ有効であり、金銭的な価値を持ちません。金銭やその他の物品との交換・換金は一切できません。</li>
+                        <li>ユーザーが退会した場合、またはアカウントが削除された場合、保有するすべてのデジタル特典は失効します。</li>
+                        <li>運営者は、デジタル特典の付与条件や内容を、事前の予告なく変更・廃止することができるものとします。</li>
+                    </ul>
+                </section>
+
+                <section style={{ marginBottom: '30px' }}>
+                    <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '15px', color: '#444' }}>第9条（利用規約の変更）</h2>
                     <p>運営者は，必要と判断した場合には，ユーザーに通知することなくいつでも本規約を変更することができるものとします。</p>
                 </section>
 
                 <section style={{ marginBottom: '30px' }}>
-                    <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '15px', color: '#444' }}>第9条（準拠法・裁判管轄）</h2>
+                    <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '15px', color: '#444' }}>第10条（準拠法・裁判管轄）</h2>
                     <p>
                         本規約の解釈にあたっては，日本法を準拠法とします。本サービスに関して紛争が生じた場合には，運営者の所在地を管轄する裁判所（さいたま地方裁判所）を専属的合意管轄裁判所とします。
                     </p>

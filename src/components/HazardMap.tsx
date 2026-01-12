@@ -218,7 +218,7 @@ export default function HazardMap({
 
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%', background: '#e0e0e0' }}>
-            <MapContainer center={[safeCenter.lat, safeCenter.lng]} zoom={zoomLevel} style={{ height: '100%', width: '100%' }}>
+            <MapContainer center={[safeCenter.lat, safeCenter.lng]} zoom={zoomLevel} zoomControl={false} style={{ height: '100%', width: '100%' }}>
                 <TileLayer attribution={tileStyle.attribution} url={tileStyle.url} />
                 {selectedCityId && <CityBoundary cityId={selectedCityId} />}
 
@@ -303,6 +303,9 @@ export default function HazardMap({
                                                     </button>
                                                 </div>
                                             )}
+                                            <div style={{ textAlign: 'right', marginTop: '6px', fontSize: '10px', color: '#aaa', fontFamily: 'monospace' }}>
+                                                ID: {post.id}
+                                            </div>
                                         </div>
                                     </Popup>
                                 </Marker>

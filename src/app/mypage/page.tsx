@@ -13,6 +13,33 @@ const formatDate = (dateString: string) => {
 
 const ITEMS_PER_PAGE = 100;
 
+// ランク定義
+const RANK_SYSTEM = [
+    { name: 'ビギナー', minScore: 0, color: '#888' },
+    { name: 'ウォッチャー', minScore: 100, color: '#4caf50' },
+    { name: 'レポーター', minScore: 300, color: '#00bcd4' },
+    { name: 'スカウト', minScore: 600, color: '#2196f3' },
+    { name: 'レンジャー', minScore: 1200, color: '#3f51b5' },
+    { name: 'センチネル', minScore: 2400, color: '#9c27b0' },
+    { name: 'ガーディアン', minScore: 5000, color: '#ff9800' },
+    { name: 'レジェンド', minScore: 10000, color: '#ff5722' }
+];
+
+const getRankInfo = (score: number) => {
+    let currentRank = RANK_SYSTEM[0];
+    let nextRank = null;
+
+    for (let i = 0; i < RANK_SYSTEM.length; i++) {
+        if (score >= RANK_SYSTEM[i].minScore) {
+            currentRank = RANK_SYSTEM[i];
+            nextRank = RANK_SYSTEM[i + 1] || null;
+        } else {
+            break;
+        }
+    }
+    return { currentRank, nextRank };
+};
+
 export default function MyPage() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<'posts' | 'empathies'>('posts');
@@ -21,6 +48,7 @@ export default function MyPage() {
     const [loading, setLoading] = useState(true);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [userId, setUserId] = useState<string | null>(null);
+    const [score, setScore] = useState(0);
 
     // ページネーション用ステート
     const [postsPage, setPostsPage] = useState(1);
@@ -70,6 +98,14 @@ export default function MyPage() {
         const validEmpathies = empathiesData?.map((item: any) => item.hazard_posts).filter((post: any) => post !== null) || [];
 
         setEmpathizedPosts(validEmpathies);
+        setEmpathizedPosts(validEmpathies);
+
+        // 3. 貢献スコアを取得
+        const { data: profile } = await supabase.from('profiles').select('contribution_score').eq('id', uid).single();
+        if (profile) {
+            setScore(profile.contribution_score || 0);
+        }
+
         setLoading(false);
     };
 
@@ -140,6 +176,8 @@ export default function MyPage() {
         );
     };
 
+    const { currentRank, nextRank } = getRankInfo(score);
+
     return (
         <div style={{ background: '#f9f9f9', minHeight: '100vh', fontFamily: 'sans-serif' }}>
             <Toaster position="top-center" />
@@ -175,8 +213,41 @@ export default function MyPage() {
                 >
                     <span style={{ fontSize: '18px' }}>←</span> マップに戻る
                 </button>
-                <h1 style={{ margin: 0, fontSize: '18px', flex: 1, textAlign: 'center', paddingRight: '110px' }}>マイページ</h1>
+                <h1 style={{ margin: 0, fontSize: '18px', flex: 1, textAlign: 'center', paddingRight: '110px', color: '#333', fontWeight: 'bold' }}>マイページ</h1>
             </header>
+
+
+
+            {/* スコア・ランク表示エリア */}
+            <div style={{ background: '#fff', padding: '20px', borderBottom: '1px solid #eee' }}>
+                <div
+                    style={{
+                        background: 'linear-gradient(135deg, #0070f3 0%, #00a6ff 100%)',
+                        color: 'white',
+                        borderRadius: '12px',
+                        padding: '20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 15px rgba(0,112,243,0.3)',
+                        maxWidth: '400px',
+                        margin: '0 auto'
+                    }}
+                >
+                    <span style={{ fontSize: '14px', fontWeight: 'bold', opacity: 0.9, marginBottom: '5px' }}>あなたの地域貢献スコア</span>
+                    <div style={{ fontSize: '42px', fontWeight: '800', lineHeight: 1, marginBottom: '10px' }}>{score.toLocaleString()}<span style={{ fontSize: '20px', marginLeft: '4px' }}>pt</span></div>
+
+                    <div style={{ background: 'rgba(255,255,255,0.2)', padding: '8px 16px', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' }}>
+                        ランク: {currentRank.name}
+                    </div>
+                    {nextRank && (
+                        <div style={{ fontSize: '12px', marginTop: '10px', opacity: 0.9 }}>
+                            次のランク「{nextRank.name}」まで あと {nextRank.minScore - score} pt
+                        </div>
+                    )}
+                </div>
+            </div>
 
             {/* タブ切り替え */}
             <div style={{ display: 'flex', background: '#fff', borderBottom: '1px solid #ddd' }}>
@@ -237,7 +308,10 @@ export default function MyPage() {
                                             }}
                                         >
                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                                <span style={{ fontSize: '12px', color: '#999' }}>{formatDate(post.created_at)}</span>
+                                                <span style={{ fontSize: '12px', color: '#999' }}>
+                                                    {formatDate(post.created_at)}
+                                                    <span style={{ marginLeft: '8px', fontFamily: 'monospace' }}>ID:{post.id}</span>
+                                                </span>
                                                 {/* 同感数バッジ */}
                                                 <span
                                                     style={{
@@ -407,55 +481,57 @@ export default function MyPage() {
             </div>
 
             {/* 画像拡大モーダル */}
-            {selectedImageUrl && (
-                <div
-                    onClick={() => setSelectedImageUrl(null)}
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: 'rgba(0,0,0,0.8)',
-                        zIndex: 1000,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '20px'
-                    }}
-                >
-                    <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '100%' }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                            src={selectedImageUrl}
-                            alt="拡大画像"
-                            style={{
-                                maxWidth: '100%',
-                                maxHeight: '90vh',
-                                borderRadius: '8px',
-                                boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
-                            }}
-                            onClick={(e) => e.stopPropagation()} // 画像クリックでは閉じない
-                        />
-                        <button
-                            onClick={() => setSelectedImageUrl(null)}
-                            style={{
-                                position: 'absolute',
-                                top: '-40px',
-                                right: '0',
-                                background: 'none',
-                                border: 'none',
-                                color: '#fff',
-                                fontSize: '30px',
-                                cursor: 'pointer',
-                                padding: '5px'
-                            }}
-                        >
-                            × 閉じる
-                        </button>
+            {
+                selectedImageUrl && (
+                    <div
+                        onClick={() => setSelectedImageUrl(null)}
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'rgba(0,0,0,0.8)',
+                            zIndex: 1000,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '20px'
+                        }}
+                    >
+                        <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '100%' }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={selectedImageUrl}
+                                alt="拡大画像"
+                                style={{
+                                    maxWidth: '100%',
+                                    maxHeight: '90vh',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+                                }}
+                                onClick={(e) => e.stopPropagation()} // 画像クリックでは閉じない
+                            />
+                            <button
+                                onClick={() => setSelectedImageUrl(null)}
+                                style={{
+                                    position: 'absolute',
+                                    top: '-40px',
+                                    right: '0',
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#fff',
+                                    fontSize: '30px',
+                                    cursor: 'pointer',
+                                    padding: '5px'
+                                }}
+                            >
+                                × 閉じる
+                            </button>
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }

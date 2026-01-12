@@ -7,16 +7,19 @@ export async function generateStaticParams() {
     const paths: { cityCode: string }[] = [];
 
     allCities.forEach((city) => {
-        // IDとSlugの両方でアクセスできるようにする
-        paths.push({ cityCode: city.slug });
-        paths.push({ cityCode: city.id });
+        // IDのみでアクセスできるようにする（ビルド時間短縮のためSlugは除外）
+        // DBから数値として返ってくる場合があるため、明示的にString化する
+        if (city.id) {
+            paths.push({ cityCode: String(city.id) });
+        }
     });
 
     return paths;
 }
 
 // キャッシュ無効化
-export const revalidate = 0;
+// キャッシュ無効化 -> Client Side Fetchで対応/Static Exportのため削除
+// export const revalidate = 0;
 
 export default async function DashboardCityPage({ params }: { params: Promise<{ cityCode: string }> }) {
     const { cityCode } = await params;

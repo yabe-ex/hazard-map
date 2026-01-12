@@ -35,9 +35,7 @@ export default function PrivacyPage() {
                             <li>
                                 <strong>不安の理由</strong>：選択肢から選ばれた内容（「暗い」「見通しが悪い」など）。
                             </li>
-                            <li>
-                                <strong>投稿日時</strong>
-                            </li>
+
                         </ul>
                         <p style={{ fontSize: '13px', color: '#666' }}>※ユーザーが自由に文章を入力する機能はありません。</p>
 
@@ -50,6 +48,11 @@ export default function PrivacyPage() {
                             </li>
                             <li>
                                 <strong>メールアドレス・アカウント情報</strong>：ログイン時のみ取得します。
+                            </li>
+                            <li>
+                                <strong>画像に含まれる撮影位置情報（Exif情報）</strong>：
+                                投稿された写真に位置情報が含まれる場合、報告場所との距離計測および信頼性確認のために利用します。
+                                元の撮影位置情報自体が一般に公開されることはありません。
                             </li>
                         </ul>
                         <p style={{ marginTop: '10px' }}>
@@ -68,7 +71,9 @@ export default function PrivacyPage() {
                             <strong>認証方法</strong>：メールアドレスまたはGoogleアカウントを選択してログインできます。
                         </li>
                         <li>
-                            <strong>ログインのメリット</strong>：過去に自分が投稿した履歴を確認したり、投稿を削除したりすることが可能になります。
+                            <strong>ログインのメリット</strong>：
+                            過去に自分が投稿した履歴を確認・削除できるほか、
+                            地域への貢献度に応じた「称号」や「スコア」を獲得し、自身の貢献活動を可視化することができます。
                         </li>
                     </ul>
                 </section>
@@ -107,12 +112,10 @@ export default function PrivacyPage() {
                     <p>本ポリシーに関するお問い合わせは、以下のお問い合わせフォームよりお願いいたします。</p>
                     <div style={{ marginTop: '10px' }}>
                         <a
-                            href="https://forms.google.com/your-form-url"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            href="/contact"
                             style={{ color: '#0070f3', textDecoration: 'underline' }}
                         >
-                            お問い合わせフォーム（Googleフォーム）
+                            お問い合わせフォーム
                         </a>
                     </div>
                 </section>
