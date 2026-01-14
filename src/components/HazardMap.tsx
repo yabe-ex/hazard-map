@@ -53,6 +53,7 @@ type Post = {
     image_url?: string;
     admin_display_color?: string;
     admin_is_white?: boolean;
+    is_resolved?: boolean;
 };
 
 type Props = {
@@ -65,37 +66,49 @@ type Props = {
     currentUserId?: string;
     isAdmin?: boolean;
     onPostUpdate?: (postId: number, newCount: number) => void;
+    onPostResolve?: (postId: number) => void; // Added for resolution
     showHeatmap?: boolean;
     heatmapRadius?: number;
     onAdminSelectPost?: (post: Post) => void;
     activePostId?: number | null;
 };
 
-const createCustomIcon = (reason: string, count: number) => {
+const createCustomIcon = (reason: string, count: number, isResolved: boolean = false) => {
     try {
         let color = 'grey';
-        switch (reason) {
-            case '暗い':
-                color = 'violet';
-                break;
-            case '見通しが悪い':
-                color = 'gold';
-                break;
-            case '人通りが少ない':
-                color = 'blue';
-                break;
-            case '歩道が狭い':
-                color = 'green';
-                break;
-            default:
-                color = 'grey';
-                break;
+        if (isResolved) {
+            color = 'green';
+        } else {
+            switch (reason) {
+                case '暗い':
+                    color = 'violet';
+                    break;
+                case '見通しが悪い':
+                    color = 'gold';
+                    break;
+                case '人通りが少ない':
+                    color = 'blue';
+                    break;
+                case '歩道が狭い':
+                    color = 'green';
+                    break;
+                default:
+                    color = 'grey';
+                    break;
+            }
+        }
+
+        // Badge logic (Empathy count or Resolved checkmark)
+        let badgeContent = '';
+        if (isResolved) {
+            badgeContent = '✔'; // Simple checkmark requested by user
+        } else if (count > 0) {
+            badgeContent = count > 99 ? '99+' : count.toString();
         }
 
         const badgeHtml =
-            count > 0
-                ? `<div style="position: absolute; top: -6px; right: -6px; background-color: #ff4d4f; color: white; border-radius: 10px; min-width: 20px; height: 20px; padding: 0 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 10;">${count > 99 ? '99+' : count
-                }</div>`
+            badgeContent
+                ? `<div style="position: absolute; top: -6px; right: -6px; background-color: ${isResolved ? '#4caf50' : '#ff4d4f'}; color: white; border-radius: 10px; min-width: 20px; height: 20px; padding: 0 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 10;">${badgeContent}</div>`
                 : '';
 
         return L.divIcon({
@@ -184,6 +197,7 @@ export default function HazardMap({
     currentUserId,
     isAdmin = false,
     onPostUpdate,
+    onPostResolve,
     showHeatmap = false,
     heatmapRadius = 50,
     onAdminSelectPost,
@@ -227,8 +241,9 @@ export default function HazardMap({
                 ) : (
                     <MarkerClusterGroup chunkedLoading>
                         {validPosts.map((post) => {
-                            const icon = createCustomIcon(post.reason, post.empathy_count || 0);
+                            const icon = createCustomIcon(post.reason, post.empathy_count || 0, post.is_resolved);
                             const showImage = isAdmin || (currentUserId && post.user_id === currentUserId);
+                            const canResolve = isAdmin;
 
                             return (
                                 <Marker
@@ -258,6 +273,7 @@ export default function HazardMap({
                                                     borderBottom: '1px solid #eee'
                                                 }}
                                             >
+                                                {post.is_resolved && <span style={{ color: 'green', marginRight: '5px' }}>✔ 解決済み</span>}
                                                 {post.reason}
                                             </div>
                                             {post.image_url && showImage && (
@@ -279,12 +295,47 @@ export default function HazardMap({
                                             <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
                                                 {[...(post.tags || []), ...(post.time_slot || []).map((t) => TIME_LABELS[t])].join('・')}
                                             </div>
-                                            <EmpathyButton
-                                                postId={post.id}
-                                                initialCount={post.empathy_count || 0}
-                                                postUserId={post.user_id}
-                                                onEmpathy={(newCount) => onPostUpdate?.(post.id, newCount)}
-                                            />
+
+                                            {!post.is_resolved && (
+                                                <EmpathyButton
+                                                    postId={post.id}
+                                                    initialCount={post.empathy_count || 0}
+                                                    postUserId={post.user_id}
+                                                    onEmpathy={(newCount) => onPostUpdate?.(post.id, newCount)}
+                                                />
+                                            )}
+
+                                            {/* Resolve Button */}
+                                            {!post.is_resolved && canResolve && (
+                                                <div style={{ marginTop: '10px' }}>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (window.confirm('この投稿を「解決済み」にしますか？')) {
+                                                                onPostResolve?.(post.id);
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            width: '100%',
+                                                            padding: '6px 10px',
+                                                            background: '#4caf50',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            borderRadius: '4px',
+                                                            cursor: 'pointer',
+                                                            fontWeight: 'bold',
+                                                            fontSize: '12px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            gap: '5px'
+                                                        }}
+                                                    >
+                                                        <span>🎉</span> 解決済みにする
+                                                    </button>
+                                                </div>
+                                            )}
+
                                             {isAdmin && (
                                                 <div style={{ marginTop: '10px', textAlign: 'center' }}>
                                                     <button

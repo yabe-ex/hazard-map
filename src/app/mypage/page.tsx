@@ -57,6 +57,8 @@ export default function MyPage() {
     // 画像ポップアップ用ステート
     const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
 
+
+
     useEffect(() => {
         // ログインチェック
         const checkUser = async () => {
@@ -98,13 +100,14 @@ export default function MyPage() {
         const validEmpathies = empathiesData?.map((item: any) => item.hazard_posts).filter((post: any) => post !== null) || [];
 
         setEmpathizedPosts(validEmpathies);
-        setEmpathizedPosts(validEmpathies);
 
         // 3. 貢献スコアを取得
         const { data: profile } = await supabase.from('profiles').select('contribution_score').eq('id', uid).single();
         if (profile) {
             setScore(profile.contribution_score || 0);
         }
+
+
 
         setLoading(false);
     };
@@ -247,6 +250,8 @@ export default function MyPage() {
                         </div>
                     )}
                 </div>
+
+
             </div>
 
             {/* タブ切り替え */}

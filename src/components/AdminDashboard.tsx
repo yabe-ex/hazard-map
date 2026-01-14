@@ -1029,6 +1029,22 @@ export default function AdminDashboard({ fixedCityCode, targetUserId, allowFilte
                         showHeatmap={isHeatmapMode}
                         heatmapRadius={heatmapRadius}
                         onAdminSelectPost={handleOpenDetail}
+                        onPostResolve={async (postId) => {
+                            try {
+                                const { error } = await supabase
+                                    .from('hazard_posts')
+                                    .update({ is_resolved: true, resolved_at: new Date().toISOString() })
+                                    .eq('id', postId);
+
+                                if (error) throw error;
+                                toast.success('解決済みにしました！');
+                                setAllPosts(prev => prev.map(p => p.id === postId ? { ...p, is_resolved: true } : p));
+                                setFilteredPosts(prev => prev.map(p => p.id === postId ? { ...p, is_resolved: true } : p));
+                            } catch (e) {
+                                console.error(e);
+                                toast.error('更新失敗');
+                            }
+                        }}
                     />
                     <div
                         style={{

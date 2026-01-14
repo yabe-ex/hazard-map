@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from 'react-hot-toast';
+import Script from 'next/script';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -11,8 +12,11 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-    title: 'みんなのマチレポ - 街の気づきを地図にする',
-    description: 'みんなで作る地域の安全・安心マップ。身近な危険箇所や気づきを投稿してシェアしよう。'
+    title: 'みんなのマチレポ - 地域の危険箇所を共有する安全マップ',
+    description: 'みんなのマチレポは、身近な危険箇所や気づきを投稿・共有できる地域安全マップです。暗い道、見通しの悪い交差点、不審者情報などをみんなでシェアして、地域の防犯・防災・安全な街づくりに役立てましょう。',
+    verification: {
+        google: 'zZEAMnnRR3ALFaktA0RrlMX6h2pzee7dd4T3ArZe6wY'
+    }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -47,6 +51,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     </div>
                 )}
                 {/* ▲▲▲ 追加ここまで ▲▲▲ */}
+
+                {/* Google Analytics */}
+                <Script
+                    src="https://www.googletagmanager.com/gtag/js?id=G-WYDVFJJ7B1"
+                    strategy="afterInteractive"
+                />
+                <Script id="google-analytics" strategy="afterInteractive">
+                    {`
+                        window.dataLayer = window.dataLayer || [];
+                        function gtag(){dataLayer.push(arguments);}
+                        gtag('js', new Date());
+
+                        gtag('config', 'G-WYDVFJJ7B1');
+                    `}
+                </Script>
             </body>
         </html>
     );

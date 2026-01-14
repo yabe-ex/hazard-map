@@ -696,7 +696,29 @@ export default function ClientMapPage({ cityData, recentPosts = [], allCities = 
     };
 
     const handlePostUpdate = (postId: number, newCount: number) => {
-        setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, empathy_count: newCount } : p)));
+        setPosts((prev) =>
+            prev.map((p) => (p.id === postId ? { ...p, empathy_count: newCount } : p))
+        );
+    };
+
+    const handlePostResolve = async (postId: number) => {
+        try {
+            const { error } = await supabase
+                .from('hazard_posts')
+                .update({ is_resolved: true, resolved_at: new Date().toISOString() })
+                .eq('id', postId);
+
+            if (error) throw error;
+
+            toast.success('解決済みにしました！🎉');
+
+            setPosts((prev) =>
+                prev.map((p) => (p.id === postId ? { ...p, is_resolved: true } : p))
+            );
+        } catch (error: any) {
+            console.error('Error resolving post:', error);
+            toast.error(`更新に失敗しました: ${error.message || error}`);
+        }
     };
 
     const handleListClick = (post: any) => {
@@ -1331,6 +1353,7 @@ export default function ClientMapPage({ cityData, recentPosts = [], allCities = 
                     mapMode={mapMode}
                     currentUserId={user?.id}
                     onPostUpdate={handlePostUpdate}
+                    onPostResolve={handlePostResolve}
                     selectedCityId={cityData?.id}
                     activePostId={activePostId}
                 />

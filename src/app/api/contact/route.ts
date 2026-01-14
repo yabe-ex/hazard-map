@@ -7,10 +7,11 @@ export async function POST(req: Request) {
         const { name, email, type, message, locationInfo, sendCopy } = body; // sendCopyを追加
 
         // 1. トランスポーターの作成
+        // 1. トランスポーターの作成
         const transporter = nodemailer.createTransport({
             host: process.env.MAIL_HOST,
-            port: 465,
-            secure: true,
+            port: Number(process.env.MAIL_PORT) || 465, // デフォルトは465だが、587に変更可能にする
+            secure: process.env.MAIL_SECURE !== 'false', // 'false'と明記しない限りtrue (465用)
             auth: {
                 user: process.env.MAIL_USER,
                 pass: process.env.MAIL_PASS
