@@ -48,6 +48,7 @@ export default function MyPage() {
     const [loading, setLoading] = useState(true);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [userId, setUserId] = useState<string | null>(null);
+    const [userEmail, setUserEmail] = useState<string | null>(null);
     const [score, setScore] = useState(0);
 
     // ページネーション用ステート
@@ -70,6 +71,7 @@ export default function MyPage() {
                 return;
             }
             setUserId(session.user.id);
+            setUserEmail(session.user.email || null);
             fetchData(session.user.id);
         };
         checkUser();
@@ -247,6 +249,18 @@ export default function MyPage() {
                     {nextRank && (
                         <div style={{ fontSize: '12px', marginTop: '10px', opacity: 0.9 }}>
                             次のランク「{nextRank.name}」まで あと {nextRank.minScore - score} pt
+                        </div>
+                    )}
+                </div>
+
+                {/* ユーザー情報（ID・Email） */}
+                <div style={{ marginTop: '20px', textAlign: 'center', color: '#666', fontSize: '13px' }}>
+                    <div style={{ marginBottom: '4px' }}>
+                        ID: <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{userId?.substring(0, 6)}</span>
+                    </div>
+                    {userEmail && (
+                        <div>
+                            {userEmail}
                         </div>
                     )}
                 </div>

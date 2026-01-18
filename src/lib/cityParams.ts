@@ -58,15 +58,38 @@ export async function getCityById(id: string): Promise<CityData | null> {
  * 全自治体リストを取得する
  */
 export async function getAllCities(): Promise<CityData[]> {
-    const { data, error } = await supabase
-        .from('cities')
-        .select('*')
-        .order('id');
+    let allData: CityData[] = [];
+    let from = 0;
+    const step = 1000;
 
-    if (error || !data || data.length === 0) {
+    while (true) {
+        const { data, error } = await supabase
+            .from('cities')
+            .select('*')
+            .range(from, from + step - 1)
+            .order('id');
+
+        if (error) {
+            console.error('Error fetching cities:', error);
+            // If first fetch fails, return fallback. If subsequent, return what we have?
+            // Safer to just break and potentially rely on partial data or fallback if empty.
+            break;
+        }
+
+        if (!data || data.length === 0) break;
+
+        allData = [...allData, ...data];
+
+        // If we fetched fewer than step, we are done
+        if (data.length < step) break;
+
+        from += step;
+    }
+
+    if (allData.length === 0) {
         // 定数フォールバック
         return Object.values(CITIES);
     }
 
-    return data as CityData[];
+    return allData as CityData[];
 }

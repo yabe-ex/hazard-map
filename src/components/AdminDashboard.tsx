@@ -8,6 +8,7 @@ import { REASONS, ReasonType, REASON_TAGS } from '@/constants/reasons';
 import { CITIES } from '@/constants/cities';
 import AdminPostDetailModal from './AdminPostDetailModal';
 import { AdminTag } from '@/types/admin';
+import { PREFECTURES } from '@/constants/prefectures';
 
 const HazardMap = dynamic(() => import('@/components/HazardMap'), {
     loading: () => <div className="p-10 text-center text-gray-500">地図を読み込み中...</div>,
@@ -488,11 +489,7 @@ export default function AdminDashboard({ fixedCityCode, targetUserId, allowFilte
     const getCityName = (slug: string) => {
         const c = cityList.find(city => city.slug === slug);
         if (!c) return slug;
-        const prefs: Record<string, string> = {
-            '08': '茨城県', '09': '栃木県', '10': '群馬県',
-            '11': '埼玉県', '12': '千葉県', '13': '東京都', '14': '神奈川県'
-        };
-        const pref = prefs[c.prefecture_code || ''] || '';
+        const pref = PREFECTURES[c.prefecture_code || '']?.name || '';
         return `${pref} ${c.name}`;
     };
     const handleJumpToPost = (lat: number, lng: number) => {
@@ -664,21 +661,13 @@ export default function AdminDashboard({ fixedCityCode, targetUserId, allowFilte
                                     }}>
                                         {cityList
                                             .filter(c => {
-                                                const prefs: Record<string, string> = {
-                                                    '08': '茨城県', '09': '栃木県', '10': '群馬県',
-                                                    '11': '埼玉県', '12': '千葉県', '13': '東京都', '14': '神奈川県'
-                                                };
-                                                const pName = prefs[c.prefecture_code || ''] || '';
+                                                const pName = PREFECTURES[c.prefecture_code || '']?.name || '';
                                                 return !citySearchQuery ||
                                                     c.name.includes(citySearchQuery) ||
                                                     pName.includes(citySearchQuery);
                                             })
                                             .map((city) => {
-                                                const prefs: Record<string, string> = {
-                                                    '08': '茨城県', '09': '栃木県', '10': '群馬県',
-                                                    '11': '埼玉県', '12': '千葉県', '13': '東京都', '14': '神奈川県'
-                                                };
-                                                const prefName = prefs[city.prefecture_code || ''] || '';
+                                                const prefName = PREFECTURES[city.prefecture_code || '']?.name || '';
                                                 return (
                                                     <div
                                                         key={city.slug}

@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import toast, { Toaster } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import { CityData } from '@/constants/cities';
+import { PREFECTURES } from '@/constants/prefectures';
 
 export default function AdminCitiesPage() {
     const router = useRouter();
@@ -170,17 +171,8 @@ export default function AdminCitiesPage() {
                             <tr key={city.id} style={{ borderBottom: '1px solid #eee' }}>
                                 <td style={{ padding: '12px' }}>
                                     {(() => {
-                                        const prefs: Record<string, { n: string, c: string }> = {
-                                            '08': { n: '茨城県', c: '#8e44ad' },
-                                            '09': { n: '栃木県', c: '#8e44ad' },
-                                            '10': { n: '群馬県', c: '#8e44ad' },
-                                            '11': { n: '埼玉県', c: '#2ecc71' },
-                                            '12': { n: '千葉県', c: '#3498db' },
-                                            '13': { n: '東京都', c: '#e67e22' },
-                                            '14': { n: '神奈川県', c: '#e74c3c' },
-                                        };
-                                        const p = prefs[city.prefecture_code || ''] || { n: city.prefecture_code, c: '#95a5a6' };
-                                        return <span style={{ color: p.c, fontWeight: 'bold' }}>{p.n}</span>;
+                                        const p = PREFECTURES[city.prefecture_code || ''] || { name: city.prefecture_code, color: '#95a5a6' };
+                                        return <span style={{ color: p.color, fontWeight: 'bold' }}>{p.name}</span>;
                                     })()}
                                 </td>
                                 <td style={{ padding: '12px', fontWeight: 'bold' }}>{city.id}</td>
@@ -279,13 +271,11 @@ export default function AdminCitiesPage() {
                                     onChange={(e) => setEditingCity({ ...editingCity, prefecture_code: e.target.value })}
                                     style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
                                 >
-                                    <option value="08">茨城県 (08)</option>
-                                    <option value="09">栃木県 (09)</option>
-                                    <option value="10">群馬県 (10)</option>
-                                    <option value="11">埼玉県 (11)</option>
-                                    <option value="12">千葉県 (12)</option>
-                                    <option value="13">東京都 (13)</option>
-                                    <option value="14">神奈川県 (14)</option>
+                                    {Object.entries(PREFECTURES).map(([code, data]) => (
+                                        <option key={code} value={code}>
+                                            {data.name} ({code})
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
 
