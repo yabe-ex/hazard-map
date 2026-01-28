@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
         workerThreads: false
     },
 
-    output: 'export',
+    //output: 'export',
 
     // ▼▼▼ 今回の修正：これを true にする ▼▼▼
     // これにより admin.html ではなく admin/index.html が生成され、

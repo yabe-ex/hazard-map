@@ -1,4 +1,6 @@
 import { MetadataRoute } from 'next';
+
+export const dynamic = 'force-static';
 import { getAllCities } from '@/lib/cityParams';
 
 const BASE_URL = 'https://machi-repo.jp';
