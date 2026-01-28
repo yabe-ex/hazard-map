@@ -1,0 +1,268 @@
+/* Layout */
+.pageContainer {
+    background: #f8f9fa;
+    min-height: 100vh;
+    padding-bottom: 60px;
+}
+
+.themeHeader {
+    background: var(--theme-color, #555);
+    padding: 20px;
+    color: white;
+    text-align: center;
+}
+
+.backLink {
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.backLink:hover {
+    text-decoration: underline;
+}
+
+.articleCard {
+    max-width: 800px;
+    margin: 40px auto;
+    background: white;
+    padding: 60px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.articleHeader {
+    margin-bottom: 40px;
+    text-align: center;
+}
+
+.categoryBadge {
+    display: inline-block;
+    padding: 6px 12px;
+    background: var(--theme-color, #555);
+    color: white;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    opacity: 0.9;
+}
+
+.title {
+    font-size: 24px;
+    /* Reduced from 32px */
+    font-weight: bold;
+    line-height: 1.4;
+    margin-bottom: 20px;
+    color: #333;
+    /* Dark gray */
+}
+
+.date {
+    font-size: 14px;
+    color: #888;
+}
+
+.thumbnail {
+    margin-bottom: 50px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.thumbnail img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Markdown Content */
+.markdownBody {
+    line-height: 1.8;
+    font-size: 15px;
+    /* Updated from 16px */
+    color: #333;
+}
+
+.markdownBody p {
+    margin-bottom: 1.5em;
+    line-height: 1.8;
+}
+
+.markdownBody h1 {
+    font-size: 1.6em;
+    /* Updated from 2em */
+    font-weight: bold;
+    margin-bottom: 20px;
+}
+
+.markdownBody h2 {
+    /* Updated from 1.4em */
+    font-size: 1.5em;
+    font-weight: bold;
+    margin-top: 40px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 10px;
+}
+
+.markdownBody h3 {
+    /* Updated from 1.25em */
+    font-size: 1.35em;
+    font-weight: bold;
+    margin-top: 30px;
+    margin-bottom: 15px;
+}
+
+.markdownBody h4 {
+    /* Updated from 1.1em */
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-top: 25px;
+    margin-bottom: 10px;
+}
+
+.markdownBody img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 20px auto;
+    /* Center image */
+    display: block;
+    /* Required for margin auto */
+}
+
+/* Global utility for manual HTML usage */
+:global(.tableWrapper) {
+    width: 100%;
+    overflow-x: auto;
+    position: relative;
+    margin-bottom: 1.5em;
+    -webkit-overflow-scrolling: touch;
+
+    /* 
+       Scroll Indicators (Arrows) 
+       - Orange background circle (rgba(255, 165, 0, 0.6))
+       - White Covers hide them when at edge
+       
+       Adjustments 2026-01-29: 
+       - Increased cover width to 60px
+       - Made cover transition steeper (solid white up to 50px) to ensure full hiding
+    */
+    background:
+        /* 1. Left Cover (White) - Hides Left Arrow at start */
+        linear-gradient(to right, white 0%, white 50px, rgba(255, 255, 255, 0) 60px),
+        /* 2. Right Cover (White) - Hides Right Arrow at end */
+        linear-gradient(to left, white 0%, white 50px, rgba(255, 255, 255, 0) 60px),
+        /* 3. Left Arrow Icon (Fixed) - Orange Circle (0.6 opacity) */
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='10' fill='rgba(255, 165, 0, 0.6)'/%3E%3Cpath d='M14 8l-4 4 4 4' stroke='white' stroke-width='2' fill='none'/%3E%3C/svg%3E"),
+        /* 4. Right Arrow Icon (Fixed) - Orange Circle (0.6 opacity) */
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='10' fill='rgba(255, 165, 0, 0.6)'/%3E%3Cpath d='M10 8l4 4-4 4' stroke='white' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+
+    background-position:
+        0 0,
+        /* Left Cover */
+        100% 0,
+        /* Right Cover */
+        10px center,
+        /* Left Arrow */
+        calc(100% - 10px) center;
+    /* Right Arrow */
+
+    background-repeat: no-repeat;
+
+    background-size:
+        60px 100%,
+        /* Left Cover Width (Widened) */
+        60px 100%,
+        /* Right Cover Width (Widened) */
+        32px 32px,
+        /* Left Arrow Size */
+        32px 32px;
+    /* Right Arrow Size */
+
+    background-attachment:
+        local,
+        /* Left Cover moves with content */
+        local,
+        /* Right Cover moves with content */
+        scroll,
+        /* Left Arrow fixed to box */
+        scroll;
+    /* Right Arrow fixed to box */
+}
+
+.markdownBody table {
+    width: 100%;
+    min-width: 600px;
+    border-collapse: collapse;
+    margin-bottom: 0;
+    font-size: 0.95em;
+    background: transparent;
+}
+
+.markdownBody th,
+.markdownBody td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: left;
+}
+
+.markdownBody th {
+    background-color: rgba(0, 0, 0, 0.05);
+    font-weight: bold;
+}
+
+.markdownBody tr:nth-child(even) {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.markdownBody dl {
+    margin-bottom: 1.5em;
+}
+
+.markdownBody dt {
+    font-weight: bold;
+    margin-top: 1em;
+    margin-bottom: 0.2em;
+}
+
+.markdownBody dd {
+    margin-left: 1.5em;
+    margin-bottom: 0.5em;
+    color: #666;
+}
+
+.markdownBody blockquote {
+    border-left: 4px solid #ddd;
+    padding-left: 1em;
+    color: #777;
+    margin-bottom: 1.5em;
+    font-style: italic;
+}
+
+.markdownBody hr {
+    border: none;
+    border-top: 2px solid #eee;
+    margin: 30px 0;
+}
+
+.markdownBody span.badge {
+    display: inline-block;
+    padding: 2px 6px;
+    background: #eee;
+    border-radius: 4px;
+    font-size: 0.85em;
+    margin: 0 2px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .articleCard {
+        padding: 30px 20px;
+        margin: 20px;
+    }
+
+    .title {
+        font-size: 24px;
+    }
+}

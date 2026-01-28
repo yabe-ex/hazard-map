@@ -33,13 +33,9 @@ export async function middleware(request: NextRequest) {
     // https://supabase.com/docs/guides/auth/server-side/nextjs
     const { data: { user }, error } = await supabase.auth.getUser()
 
-    // Debug logging
-    console.log(`[Middleware] Path: ${request.nextUrl.pathname}, User: ${user?.id || 'None'}`);
-
     // CMS Route Protection
     if (request.nextUrl.pathname.startsWith('/dashboard/cms')) {
         if (!user) {
-            console.log('[Middleware] CMS Access denied: No user');
             return NextResponse.redirect(new URL('/', request.url));
         }
 
@@ -50,10 +46,7 @@ export async function middleware(request: NextRequest) {
             .eq('user_id', user.id)
             .single();
 
-        console.log(`[Middleware] User Role: ${roleData?.role}`);
-
         if (roleError || !roleData || roleData.role !== 'super_admin') {
-            console.log('[Middleware] CMS Access denied: Not super_admin');
             return NextResponse.redirect(new URL('/dashboard', request.url)); // Redirect to dashboard or home
         }
     }

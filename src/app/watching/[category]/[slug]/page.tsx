@@ -2,6 +2,7 @@ import { getArticleBySlug, getAllArticleSlugs } from '@/lib/cms';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import styles from '@/app/article.module.css';
 
 
 
@@ -35,23 +36,19 @@ export default async function WatchingArticlePage({
 
     // 2. If not found or preview mode, check if it's a draft and user is admin (Private)
     if (!article) {
-        console.log(`[Draft Check] Trying to fetch draft for ${category}/${slug}, preview=${preview}`);
         try {
             const supabase = await createClient();
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
-            console.log(`[Draft Check] User: ${user?.email}, AuthError: ${authError?.message}`);
+            const { data: { user } } = await supabase.auth.getUser();
 
             if (user) {
                 article = await getArticleBySlug(category, slug, { includeDrafts: true, client: supabase });
-                console.log(`[Draft Check] Draft fetch result: ${article ? 'Found' : 'Not Found'}`);
             }
         } catch (e) {
-            console.error('[Draft Check] Error:', e);
+            // Ignore error
         }
     }
 
     if (!article) {
-        console.log(`[Draft Check] Article not found, returning 404`);
         notFound();
     }
 
@@ -76,27 +73,33 @@ export default async function WatchingArticlePage({
     const themeColor = getCategoryColor(category);
 
     return (
-        <div style={{ background: '#f8f9fa', minHeight: '100vh', paddingBottom: '60px' }}>
-            <div style={{ background: themeColor, padding: '20px', color: 'white', textAlign: 'center' }}>
-                <Link href={`/watching/${category}`} style={{ color: 'white', textDecoration: 'none', fontWeight: 'bold' }}>
+        <div className={styles.pageContainer}>
+            <div
+                className={styles.themeHeader}
+                style={{ '--theme-color': themeColor } as React.CSSProperties}
+            >
+                <Link href={`/watching/${category}`} className={styles.backLink}>
                     ← {getCategoryLabel(category)}TOPへ戻る
                 </Link>
             </div>
 
-            <article style={{ maxWidth: '800px', margin: '40px auto', background: 'white', padding: '60px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                <header style={{ marginBottom: '40px', textAlign: 'center' }}>
-                    <div style={{ display: 'inline-block', padding: '6px 12px', background: themeColor, color: 'white', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', marginBottom: '20px', opacity: 0.9 }}>
+            <article className={styles.articleCard}>
+                <header className={styles.articleHeader}>
+                    <div
+                        className={styles.categoryBadge}
+                        style={{ '--theme-color': themeColor } as React.CSSProperties}
+                    >
                         {getCategoryLabel(category)}
                     </div>
-                    <h1 style={{ fontSize: '32px', fontWeight: 'bold', lineHeight: '1.4', marginBottom: '20px' }}>{article.title}</h1>
-                    <div style={{ fontSize: '14px', color: '#888' }}>
+                    <h1 className={styles.title}>{article.title}</h1>
+                    <div className={styles.date}>
                         {article.published_at ? new Date(article.published_at).toLocaleDateString() : ''}
                     </div>
                 </header>
 
                 {article.thumbnail_url && (
-                    <div style={{ marginBottom: '50px', borderRadius: '8px', overflow: 'hidden' }}>
-                        <img src={article.thumbnail_url} alt={article.title} style={{ width: '100%', height: 'auto' }} />
+                    <div className={styles.thumbnail}>
+                        <img src={article.thumbnail_url} alt={article.title} />
                     </div>
                 )}
 
