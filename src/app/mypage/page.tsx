@@ -369,6 +369,26 @@ export default function MyPage() {
                                                             </span>
                                                         ))}
                                                     </div>
+
+                                                    {/* 一言コメントの表示 */}
+                                                    {post.description && (
+                                                        <div
+                                                            style={{
+                                                                marginBottom: '10px',
+                                                                padding: '10px',
+                                                                background: '#f9f9f9',
+                                                                border: '1px solid #eee',
+                                                                borderRadius: '8px',
+                                                                fontSize: '13px',
+                                                                color: '#555'
+                                                            }}
+                                                        >
+                                                            <div style={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '11px', color: '#888' }}>
+                                                                📝 一言コメント
+                                                            </div>
+                                                            {post.description}
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {/* 画像表示（サムネイル） */}

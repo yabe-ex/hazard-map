@@ -47,6 +47,23 @@ export const CITIES: Record<string, CityData> = {
         lat: 35.8794,
         lng: 139.5197,
         zoom: 13
+    },
+    toda: {
+        id: '11224',
+        name: '戸田市',
+        slug: 'toda',
+        lat: 35.8169,
+        lng: 139.6732,
+        zoom: 13
+    },
+    higashiagatsuma: {
+        id: '10429',
+        name: '東吾妻町',
+        slug: 'agatsuma-higashiagatsuma',
+        lat: 36.5715,
+        lng: 138.8241,
+        zoom: 13,
+        prefecture_code: '10'
     }
 };
 
@@ -56,5 +73,6 @@ export const CITY_NAME_TO_CODE: Record<string, string> = {
     川越市: '11201',
     所沢市: '11208',
     狭山市: '11215',
-    ふじみ野市: '11245'
+    ふじみ野市: '11245',
+    戸田市: '11224'
 };

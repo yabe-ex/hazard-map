@@ -325,6 +325,23 @@ export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, 
                                 ))}
                             </div>
                         </div>
+                        {post.description && (
+                            <div style={{ marginBottom: '15px' }}>
+                                <h4 style={{ fontSize: '14px', color: '#555', marginBottom: '5px', fontWeight: 'bold' }}>一言コメント（非公開）</h4>
+                                <div style={{
+                                    fontSize: '13px',
+                                    padding: '10px',
+                                    background: '#fff3cd',
+                                    border: '1px solid #ffeeba',
+                                    borderRadius: '6px',
+                                    color: '#856404',
+                                    lineHeight: '1.5',
+                                    whiteSpace: 'pre-wrap'
+                                }}>
+                                    {post.description}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* ▼▼▼ 右カラム：管理機能（メモ欄を拡大） ▼▼▼ */}

@@ -26,10 +26,11 @@ const INITIAL_VISIBLE_COLUMNS = {
     empathy: true,
     date: true,
     adminTags: true,
+    description: true,
     actions: true
 };
 
-type SortKey = 'id' | 'reason' | 'address' | 'empathy_count' | 'created_at';
+type SortKey = 'id' | 'reason' | 'address' | 'empathy_count' | 'created_at' | 'description';
 type SortOrder = 'asc' | 'desc';
 
 type AdminDashboardProps = {
@@ -51,6 +52,7 @@ export default function AdminDashboard({ fixedCityCode, targetUserId, allowFilte
     // Filter States
     const [filterKeyword, setFilterKeyword] = useState('');
     const [filterHasPhoto, setFilterHasPhoto] = useState(false);
+    const [filterHasComment, setFilterHasComment] = useState(false);
     const [filterIsQualified, setFilterIsQualified] = useState(false);
     const [selectedReasons, setSelectedReasons] = useState<ReasonType[]>([]);
     const [selectedAdminTagIds, setSelectedAdminTagIds] = useState<number[]>([]);
@@ -256,6 +258,7 @@ export default function AdminDashboard({ fixedCityCode, targetUserId, allowFilte
         }
 
         if (filterHasPhoto) temp = temp.filter((p) => p.image_url);
+        if (filterHasComment) temp = temp.filter((p) => p.description && p.description.trim().length > 0);
         if (filterIsQualified) temp = temp.filter((p) => p.image_url && p.photo_taken_at !== null && p.photo_taken_at <= 300);
 
         if (selectedReasons.length > 0) temp = temp.filter((p) => selectedReasons.includes(p.reason));
@@ -304,6 +307,7 @@ export default function AdminDashboard({ fixedCityCode, targetUserId, allowFilte
         currentCityKey,
         filterKeyword,
         filterHasPhoto,
+        filterHasComment,
         filterIsQualified,
         selectedReasons,
         selectedAdminTagIds,
@@ -391,7 +395,7 @@ export default function AdminDashboard({ fixedCityCode, targetUserId, allowFilte
             return;
         }
 
-        const header = ['ID', '日時', '不安カテゴリ', '住所', '詳細タグ(ユーザー)', '管理ステータス', '同感数', '緯度', '経度', '画像URL'];
+        const header = ['ID', '日時', '不安カテゴリ', '住所', '詳細タグ(ユーザー)', '管理ステータス', '同感数', '緯度', '経度', '画像URL', '管理者へのコメント'];
         const rows = targetPosts.map((post) => {
             const dateStr = new Date(post.created_at).toLocaleString('ja-JP');
             const userTagsStr = post.tags ? post.tags.join(' | ') : '';
@@ -407,7 +411,8 @@ export default function AdminDashboard({ fixedCityCode, targetUserId, allowFilte
                 escape(post.empathy_count),
                 escape(post.lat),
                 escape(post.lng),
-                escape(post.image_url)
+                escape(post.image_url),
+                escape(post.description)
             ].join(',');
         });
 
@@ -581,6 +586,28 @@ export default function AdminDashboard({ fixedCityCode, targetUserId, allowFilte
 
                 {/* Fixed Count Display */}
                 <div style={{ padding: '15px 20px 0', flexShrink: 0 }}>
+                    {/* Survey Link for Super Admin */}
+                    {!fixedCityCode && (
+                        <a
+                            href="/dashboard/admin/survey"
+                            style={{
+                                display: 'block',
+                                marginBottom: '15px',
+                                padding: '10px',
+                                background: '#27ae60',
+                                color: 'white',
+                                textAlign: 'center',
+                                borderRadius: '6px',
+                                textDecoration: 'none',
+                                fontWeight: 'bold',
+                                fontSize: '13px',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                            }}
+                        >
+                            📊 アンケート結果一覧
+                        </a>
+                    )}
+
                     <div
                         style={{
                             background: 'white',
@@ -1172,6 +1199,27 @@ export default function AdminDashboard({ fixedCityCode, targetUserId, allowFilte
                                         )}
                                     </div>
 
+                                    {/* 2.2 コメントフィルタ */}
+                                    <label
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            cursor: 'pointer',
+                                            color: '#333',
+                                            fontSize: '13px',
+                                            fontWeight: 'bold'
+                                        }}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={filterHasComment}
+                                            onChange={(e) => setFilterHasComment(e.target.checked)}
+                                            style={{ accentColor: '#e67e22', width: '16px', height: '16px' }}
+                                        />
+                                        コメントあり
+                                    </label>
+
                                     {/* 2. 写真フィルタ */}
                                     <label
                                         style={{
@@ -1192,6 +1240,8 @@ export default function AdminDashboard({ fixedCityCode, targetUserId, allowFilte
                                         />
                                         写真あり
                                     </label>
+
+
 
                                     {/* 2.5 距離フィルタ */}
                                     <label
@@ -1309,7 +1359,9 @@ export default function AdminDashboard({ fixedCityCode, targetUserId, allowFilte
                                                                             ? '日時'
                                                                             : col === 'adminTags'
                                                                                 ? '管理タグ'
-                                                                                : '操作'}
+                                                                                : col === 'description'
+                                                                                    ? 'コメント'
+                                                                                    : '操作'}
                                                 </label>
                                             ))}
                                         </div>
@@ -1361,6 +1413,7 @@ export default function AdminDashboard({ fixedCityCode, targetUserId, allowFilte
                                                 管理タグ
                                             </th>
                                         )}
+                                        {visibleColumns.description && renderSortHeader('コメント', 'description', 'left', '150px')}
                                         {visibleColumns.actions && (
                                             <th style={{ padding: '14px', textAlign: 'center', color: '#fff', fontWeight: '600' }}>操作</th>
                                         )}
@@ -1517,11 +1570,25 @@ export default function AdminDashboard({ fixedCityCode, targetUserId, allowFilte
                                                                 color: '#2c3e50',
                                                                 borderRadius: '4px',
                                                                 cursor: 'pointer',
-                                                                fontSize: '12px'
+                                                                fontSize: '12px',
+                                                                position: 'relative' // Added for absolute positioning of the icon
                                                             }}
                                                             title="詳細"
                                                         >
                                                             🛠
+                                                            {post.description && (
+                                                                <span
+                                                                    style={{
+                                                                        position: 'absolute',
+                                                                        top: '-8px',
+                                                                        right: '-8px',
+                                                                        fontSize: '14px',
+                                                                        filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.1))'
+                                                                    }}
+                                                                >
+                                                                    📝
+                                                                </span>
+                                                            )}
                                                         </button>
                                                     </div>
                                                 </td>

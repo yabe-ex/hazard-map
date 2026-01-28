@@ -1,0 +1,23 @@
+DirectoryIndex disabled
+SetEnvIf Request_URI ".*" Ngx_Cache_NoCacheMode=off
+SetEnvIf Request_URI ".*" Ngx_Cache_AllCacheMode
+
+RewriteEngine on
+
+# 1. HTTPSへのリダイレクト
+RewriteCond %{HTTPS} !on
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# Survey cache busting redirect
+# Accessing /survey/ (without query params) -> /survey/?key=1
+RewriteCond %{REQUEST_URI} ^/survey/$ [OR]
+RewriteCond %{REQUEST_URI} ^/survey$
+RewriteCond %{QUERY_STRING} ^$
+RewriteRule ^(.*)$ /survey/?key=1 [R=302,L]
+
+# 2. Node.js (Port 3000) への転送
+RewriteRule ^$ http://127.0.0.1:3000/ [P,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ http://127.0.0.1:3000/$1 [P,L]

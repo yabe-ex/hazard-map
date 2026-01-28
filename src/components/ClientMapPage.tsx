@@ -320,6 +320,7 @@ export default function ClientMapPage({ cityData, recentPosts = [], allCities = 
     const [formReason, setFormReason] = useState<ReasonType>('暗い');
     const [formTags, setFormTags] = useState<string[]>([]);
     const [formTimes, setFormTimes] = useState<string[]>([]);
+    const [formDescription, setFormDescription] = useState(''); // New state for private comment
     const [duplicatePost, setDuplicatePost] = useState<any | null>(null);
     const [isSelfDuplicate, setIsSelfDuplicate] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -422,6 +423,7 @@ export default function ClientMapPage({ cityData, recentPosts = [], allCities = 
         setIsSelfDuplicate(false);
         setFormTags([]);
         setFormTimes([]);
+        setFormDescription('');
         setSelectedFile(null);
         setPreviewUrl(null);
     }, [formReason, isModalOpen]);
@@ -654,7 +656,8 @@ export default function ClientMapPage({ cityData, recentPosts = [], allCities = 
                 address: fullAddress,
                 image_url: uploadedImageUrl,
                 is_location_verified: isLocationVerified,
-                photo_taken_at: photoDistance ? Math.round(photoDistance) : null
+                photo_taken_at: photoDistance ? Math.round(photoDistance) : null,
+                description: formDescription // Insert private comment
             }
         ]);
 
@@ -665,6 +668,7 @@ export default function ClientMapPage({ cityData, recentPosts = [], allCities = 
             setIsModalOpen(false);
             setFormTags([]);
             setFormTimes([]);
+            setFormDescription('');
             setDuplicatePost(null);
             fetchPosts();
         }
@@ -686,6 +690,7 @@ export default function ClientMapPage({ cityData, recentPosts = [], allCities = 
         setIsModalOpen(false);
         setFormTags([]);
         setFormTimes([]);
+        setFormDescription('');
         setDuplicatePost(null);
         fetchPosts();
     };
@@ -1678,6 +1683,30 @@ export default function ClientMapPage({ cityData, recentPosts = [], allCities = 
                                                 </button>
                                             </div>
                                         )}
+                                    </div>
+
+                                    <div style={sectionStyle}>
+                                        <label style={labelStyle}>
+                                            一言コメント <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#888' }}>（非公開・任意）</span>
+                                        </label>
+                                        <textarea
+                                            value={formDescription}
+                                            onChange={(e) => setFormDescription(e.target.value)}
+                                            placeholder="具体的な状況や補足事項があれば入力してください。（地図上の吹き出しには表示されません）"
+                                            style={{
+                                                width: '100%',
+                                                minHeight: '80px',
+                                                padding: '12px',
+                                                borderRadius: '8px',
+                                                border: '1px solid #ccc',
+                                                backgroundColor: 'white',
+                                                color: '#333',
+                                                resize: 'vertical',
+                                                fontSize: '14px',
+                                                lineHeight: '1.5',
+                                                fontFamily: 'inherit'
+                                            }}
+                                        />
                                     </div>
 
                                     <div style={{ display: 'flex', gap: '12px', marginTop: '30px' }}>
