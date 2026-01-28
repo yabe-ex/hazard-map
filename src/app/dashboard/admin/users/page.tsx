@@ -68,6 +68,59 @@ export default function UserListPage() {
         return `${y}-${m}-${day}`;
     };
 
+    // --- Sorting Logic ---
+    type SortKey = keyof UserStat;
+    const [sortKey, setSortKey] = useState<SortKey>('created_at');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+    const handleSort = (key: SortKey) => {
+        if (sortKey === key) {
+            setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortKey(key);
+            setSortOrder('desc'); // Default to desc for new key
+        }
+    };
+
+    const sortedUsers = [...users].sort((a, b) => {
+        let valA = a[sortKey];
+        let valB = b[sortKey];
+
+        if (valA === null || valA === undefined) return 1;
+        if (valB === null || valB === undefined) return -1;
+
+        if (typeof valA === 'string' && typeof valB === 'string') {
+            valA = valA.toLowerCase();
+            valB = valB.toLowerCase();
+        }
+
+        if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+        if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    const SortHeader = ({ label, itemKey, center = false }: { label: string, itemKey: SortKey, center?: boolean }) => (
+        <th
+            onClick={() => handleSort(itemKey)}
+            style={{
+                padding: '12px',
+                textAlign: center ? 'center' : 'left',
+                cursor: 'pointer',
+                userSelect: 'none',
+                background: sortKey === itemKey ? '#eaeaea' : 'transparent',
+                transition: 'background 0.2s'
+            }}
+            title={`${label}で並び替え`}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: center ? 'center' : 'flex-start', gap: '4px' }}>
+                {label}
+                <span style={{ fontSize: '10px', color: sortKey === itemKey ? '#333' : '#ccc' }}>
+                    {sortKey === itemKey ? (sortOrder === 'asc' ? '▲' : '▼') : '▼'}
+                </span>
+            </div>
+        </th>
+    );
+
     return (
         <div style={{ padding: '20px', fontFamily: 'sans-serif', color: '#333' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -126,33 +179,33 @@ export default function UserListPage() {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                         <thead style={{ background: '#f8f9fa', borderBottom: '2px solid #ddd', color: '#333' }}>
                             <tr>
-                                <th style={{ padding: '12px', textAlign: 'left' }}>User ID</th>
-                                <th style={{ padding: '12px', textAlign: 'left' }}>メールアドレス</th>
-                                <th style={{ padding: '12px', textAlign: 'center' }}>登録日</th>
-                                <th style={{ padding: '12px', textAlign: 'center' }}>投稿数</th>
-                                <th style={{ padding: '12px', textAlign: 'center' }}>写真投稿</th>
-                                <th style={{ padding: '12px', textAlign: 'center' }}>同感数</th>
-                                <th style={{ padding: '12px', textAlign: 'center' }}>被同感数</th>
-                                <th style={{ padding: '12px', textAlign: 'center' }}>獲得ポイント</th>
-                                <th style={{ padding: '12px', textAlign: 'center' }}>最終活動</th>
+                                <SortHeader label="User ID" itemKey="user_id" />
+                                <SortHeader label="メールアドレス" itemKey="email" />
+                                <SortHeader label="投稿数" itemKey="post_count" center />
+                                <SortHeader label="写真投稿" itemKey="photo_post_count" center />
+                                <SortHeader label="同感数" itemKey="given_reactions" center />
+                                <SortHeader label="被同感数" itemKey="received_reactions" center />
+                                <SortHeader label="獲得ポイント" itemKey="contribution_score" center />
+                                <SortHeader label="登録日" itemKey="created_at" center />
+                                <SortHeader label="最終活動" itemKey="last_active_at" center />
                                 <th style={{ padding: '12px', textAlign: 'center' }}>操作</th>
                             </tr>
                         </thead>
                         <tbody style={{ color: '#333' }}>
-                            {users.map((user) => (
+                            {sortedUsers.map((user) => (
                                 <tr key={user.user_id} style={{ borderBottom: '1px solid #eee' }}>
                                     <td style={{ padding: '12px', fontFamily: 'monospace', fontSize: '12px', color: '#555' }}>
                                         {user.user_id.substring(0, 8)}...
                                     </td>
                                     <td style={{ padding: '12px' }}>{user.email || 'メール不明'}</td>
-                                    <td style={{ padding: '12px', textAlign: 'center' }}>
-                                        {formatDate(user.created_at)}
-                                    </td>
                                     <td style={{ padding: '12px', textAlign: 'center', fontWeight: 'bold' }}>{user.post_count}</td>
                                     <td style={{ padding: '12px', textAlign: 'center' }}>{user.photo_post_count}</td>
                                     <td style={{ padding: '12px', textAlign: 'center', color: '#2980b9' }}>{user.given_reactions}</td>
                                     <td style={{ padding: '12px', textAlign: 'center', color: '#e74c3c' }}>{user.received_reactions}</td>
                                     <td style={{ padding: '12px', textAlign: 'center', fontWeight: 'bold', color: '#e67e22' }}>{user.contribution_score}</td>
+                                    <td style={{ padding: '12px', textAlign: 'center' }}>
+                                        {formatDate(user.created_at)}
+                                    </td>
                                     <td style={{ padding: '12px', textAlign: 'center' }}>
                                         {formatDate(user.last_active_at)}
                                     </td>
