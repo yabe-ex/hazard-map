@@ -200,6 +200,21 @@ export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, 
         }
     };
 
+    const handleDeletePost = async () => {
+        if (!window.confirm('本当にこの投稿を削除しますか？\n削除すると元に戻すことはできません。')) return;
+
+        const { error } = await supabase.from('hazard_posts').delete().eq('id', post.id);
+
+        if (error) {
+            console.error(error);
+            toast.error('投稿の削除に失敗しました');
+        } else {
+            toast.success('投稿を削除しました');
+            onClose();
+            onUpdate();
+        }
+    };
+
     if (!isOpen || !post) return null;
 
     return (
@@ -619,6 +634,27 @@ export default function AdminPostDetailModal({ post, isOpen, onClose, onUpdate, 
                                         </button>
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* 3. 削除セクション (危険エリア) */}
+                            <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #eee' }}>
+                                <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '10px', color: '#c0392b' }}>⚠️ 投稿の管理</h3>
+                                <button
+                                    onClick={handleDeletePost}
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px',
+                                        background: '#fff0f0',
+                                        color: '#c0392b',
+                                        border: '1px solid #e74c3c',
+                                        borderRadius: '6px',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer',
+                                        fontSize: '13px'
+                                    }}
+                                >
+                                    この投稿を削除する
+                                </button>
                             </div>
                         </div>
                     </div>
